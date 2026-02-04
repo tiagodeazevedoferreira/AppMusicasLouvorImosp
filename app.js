@@ -6,14 +6,14 @@ let letrasMap = new Map(); // nome -> letra
 
 async function carregarDados() {
   try {
-    // Carrega aba Músicas
+    // Carrega aba Músicas (agora com coluna extra Cifra)
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
     const dataMusicas = await resMusicas.json();
     musicas = dataMusicas.values.slice(1); // remove cabeçalho
 
-    // Carrega aba Letras
+    // Carrega aba Letras (sem mudança)
     const resLetras = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Letras?key=${API_KEY}`
     );
@@ -58,7 +58,7 @@ function filtrarEMostrar() {
   const data = document.getElementById('filtroData').value;
 
   const resultadosFiltrados = musicas.filter(mus => {
-    const [nomeMus, tom, art, link, dt] = mus;
+    const [nomeMus, tom, art, link, dt, cifra] = mus; // Adicionada cifra (índice 5)
 
     const matchNome = !nome || nomeMus.toLowerCase().includes(nome);
     const matchArtista = !artista || art === artista;
@@ -86,7 +86,7 @@ function mostrarResultados(lista) {
   }
 
   lista.forEach(mus => {
-    const [nomeMus, tom, artista, link] = mus; // Data removida da exibição
+    const [nomeMus, tom, artista, link, data, cifraLink] = mus; // Adicionada cifraLink
     const letra = letrasMap.get(nomeMus.trim().toLowerCase()) || 'Letra não encontrada';
 
     // Extrai ID do YouTube
@@ -95,6 +95,9 @@ function mostrarResultados(lista) {
       const match = link.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
       videoId = match ? match[1] : '';
     }
+
+    // Verifica se há link de cifra válido
+    const hasCifra = cifraLink && typeof cifraLink === 'string' && cifraLink.trim().startsWith('http');
 
     const card = document.createElement('div');
     card.className = 'col-12';
@@ -114,9 +117,17 @@ function mostrarResultados(lista) {
           <div class="letra-expand mt-2">${letra}</div>
 
           ${videoId ? `
-            <button class="btn btn-outline-danger btn-sm mt-2" 
+            <button class="btn btn-outline-danger btn-sm mt-2 me-2" 
                     onclick="this.nextElementSibling.innerHTML = '<div class=\\\'iframe-container\\\'><iframe src=\\\'https://www.youtube.com/embed/${videoId}\\\' frameborder=\\\'0\\\' allowfullscreen></iframe></div>'">
               Ver vídeo
+            </button>
+            <div class="mt-3"></div>
+          ` : ''}
+
+          ${hasCifra ? `
+            <button class="btn btn-outline-success btn-sm mt-2" 
+                    onclick="this.nextElementSibling.innerHTML = '<div class=\\\'iframe-container\\\'><iframe src=\\\'${cifraLink.trim()}\\\' frameborder=\\\'0\\\' allowfullscreen></iframe></div>'">
+              Ver cifra
             </button>
             <div class="mt-3"></div>
           ` : ''}
@@ -139,7 +150,7 @@ document.getElementById('btnLimpar').addEventListener('click', () => {
   document.getElementById('filtroArtista').value = '';
   document.getElementById('filtroLetra').value = '';
   document.getElementById('filtroData').value = '';
-  filtrarEMostrar(); // Mostra todas novamente
+  filtrarEMostrar();
 });
 
 // Inicia o carregamento
