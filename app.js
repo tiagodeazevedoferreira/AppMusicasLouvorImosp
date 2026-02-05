@@ -6,12 +6,13 @@ const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A';
 let musicas = [];
 let dadosFirebaseMap = new Map(); // chave normalizada → { letra, cifra }
 
-// Normaliza nome para chave do Firebase
+// Normalização de nome (exatamente igual ao script de migração)
 function normalizarNome(nome) {
-  if (!nome) return '';
+  if (!nome || typeof nome !== 'string') return '';
   return nome.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-');
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')     // remove acentos
+    .replace(/[^a-z0-9]+/g, '-')                           // tudo que não é letra/número vira hífen
+    .replace(/^-+|-+$/g, '');                              // remove hífens no início/fim
 }
 
 // Carrega dados
@@ -21,38 +22,44 @@ async function carregarDados() {
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
-    if (!resMusicas.ok) throw new Error('Erro ao carregar Músicas');
+    if (!resMusicas.ok) throw new Error(`Erro na planilha: ${resMusicas.status}`);
     const dataMusicas = await resMusicas.json();
-    musicas = dataMusicas.values.slice(1);
-    console.log('Músicas carregadas da planilha:', musicas.length);
+    musicas = dataMusicas.values?.slice(1) || [];
+    console.log('Músicas da planilha carregadas:', musicas.length);
 
-    // Tenta carregar do Firebase
+    // Carrega do Firebase
     if (window.firebaseDb) {
-      const dbRef = ref(window.firebaseDb, 'musicas');
-      const snapshot = await get(dbRef);
-      if (snapshot.exists()) {
-        const dados = snapshot.val();
-        Object.keys(dados).forEach(chave => {
-          dadosFirebaseMap.set(chave, {
-            letra: dados[chave].letra || 'Letra não encontrada',
-            cifra: dados[chave].cifra || ''
+      try {
+        const dbRef = ref(window.firebaseDb, 'musicas');
+        const snapshot = await get(dbRef);
+
+        if (snapshot.exists()) {
+          const dados = snapshot.val();
+          Object.keys(dados).forEach(chave => {
+            const item = dados[chave];
+            dadosFirebaseMap.set(chave, {
+              letra: item.letra || 'Letra não encontrada no Firebase',
+              cifra: item.cifra || ''
+            });
           });
-        });
-        console.log('Firebase carregado:', dadosFirebaseMap.size, 'itens');
-      } else {
-        console.warn('Nenhum dado no Firebase');
+          console.log('Firebase carregado com sucesso. Total de músicas:', dadosFirebaseMap.size);
+        } else {
+          console.warn('Nenhum dado encontrado no nó "musicas"');
+        }
+      } catch (fbErr) {
+        console.error('Erro ao acessar Firebase (continuando sem ele):', fbErr.message);
       }
     } else {
-      console.warn('Firebase não inicializado');
+      console.warn('FirebaseDb não inicializado no window');
     }
 
     preencherFiltros();
     filtrarEMostrar();
   } catch (err) {
-    console.error('Erro geral ao carregar:', err);
+    console.error('Erro geral no carregamento:', err);
     document.getElementById('resultados').innerHTML = 
-      '<p class="text-warning">Alguns dados não carregaram. Clique em "Limpar filtros" para tentar novamente.</p>';
-    // Continua com o que foi carregado
+      '<p class="text-warning">Falha parcial no carregamento. Alguns dados podem estar indisponíveis. Tente "Limpar filtros".</p>';
+    // Continua com o que carregou
     preencherFiltros();
     filtrarEMostrar();
   }
@@ -64,51 +71,53 @@ function preencherFiltros() {
   const selectData = document.getElementById('filtroData');
   const selectMusica = document.getElementById('filtroMusica');
 
-  // Limpa opções existentes (exceto a primeira)
-  [selectArtista, selectTom, selectData, selectMusica].forEach(select => {
-    while (select.options.length > 1) select.remove(1);
+  // Limpa opções (mantém a primeira vazia)
+  [selectArtista, selectTom, selectData, selectMusica].forEach(sel => {
+    while (sel.options.length > 1) sel.remove(1);
   });
 
   // Artistas
-  const artistasUnicos = [...new Set(musicas.map(m => m[2] || ''))].filter(Boolean).sort();
-  artistasUnicos.forEach(art => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = art;
-    selectArtista.appendChild(opt);
-  });
+  [...new Set(musicas.map(m => m[2] || ''))]
+    .filter(Boolean)
+    .sort()
+    .forEach(art => {
+      const opt = new Option(art, art);
+      selectArtista.add(opt);
+    });
 
   // Tons
-  const tonsUnicos = [...new Set(musicas.map(m => m[1] || ''))].filter(Boolean).sort();
-  tonsUnicos.forEach(tom => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = tom;
-    selectTom.appendChild(opt);
-  });
+  [...new Set(musicas.map(m => m[1] || ''))]
+    .filter(Boolean)
+    .sort()
+    .forEach(tom => {
+      const opt = new Option(tom, tom);
+      selectTom.add(opt);
+    });
 
   // Datas
-  const datasUnicas = [...new Set(musicas.map(m => m[4] || ''))].filter(Boolean).sort().reverse();
-  datasUnicas.forEach(dt => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = dt;
-    selectData.appendChild(opt);
-  });
+  [...new Set(musicas.map(m => m[4] || ''))]
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a))
+    .forEach(dt => {
+      const opt = new Option(dt, dt);
+      selectData.add(opt);
+    });
 
   // Músicas
-  const musicasValidas = musicas
-    .filter(m => m[0] && typeof m[0] === 'string' && m[0].trim())
-    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
-  musicasValidas.forEach(m => {
-    const nome = m[0].trim();
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = nome;
-    selectMusica.appendChild(opt);
-  });
+  musicas
+    .filter(m => m[0]?.trim())
+    .sort((a, b) => (a[0] || '').localeCompare(b[0] || '', 'pt-BR'))
+    .forEach(m => {
+      const nome = m[0].trim();
+      const opt = new Option(nome, nome);
+      selectMusica.add(opt);
+    });
 }
 
 function filtrarEMostrar() {
-  // Declara todas as variáveis no início (isso corrige o erro)
+  // Declara TODAS as variáveis no início para evitar ReferenceError
   const musicaSelecionada = document.getElementById('filtroMusica')?.value || '';
-  const nome = document.getElementById('filtroNome')?.value?.trim().toLowerCase() || '';
+  const nomeBusca = document.getElementById('filtroNome')?.value?.trim().toLowerCase() || '';
   const artista = document.getElementById('filtroArtista')?.value || '';
   const tom = document.getElementById('filtroTom')?.value || '';
   const letraBusca = document.getElementById('filtroLetra')?.value?.trim().toLowerCase() || '';
@@ -118,7 +127,7 @@ function filtrarEMostrar() {
     const [nomeMus, tomMus, art, link, dt] = mus || [];
 
     const matchMusica = !musicaSelecionada || nomeMus === musicaSelecionada;
-    const matchNome = !nome || (nomeMus || '').toLowerCase().includes(nome);
+    const matchNome = !nomeBusca || (nomeMus || '').toLowerCase().includes(nomeBusca);
     const matchArtista = !artista || art === artista;
     const matchTom = !tom || tomMus === tom;
     const matchData = !data || dt === data;
@@ -211,7 +220,8 @@ document.getElementById('filtroData')?.addEventListener('change', filtrarEMostra
 
 document.getElementById('btnLimpar')?.addEventListener('click', () => {
   ['filtroMusica', 'filtroNome', 'filtroArtista', 'filtroTom', 'filtroLetra', 'filtroData'].forEach(id => {
-    document.getElementById(id).value = '';
+    const el = document.getElementById(id);
+    if (el) el.value = '';
   });
   filtrarEMostrar();
 });
