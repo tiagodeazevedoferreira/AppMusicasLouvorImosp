@@ -1,3 +1,6 @@
+// app.js - COMPLETO e CORRIGIDO
+import { ref, get } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
 // Configurações
 const SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
 const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A';
@@ -6,7 +9,7 @@ const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A';
 let musicas = [];
 let dadosFirebaseMap = new Map();
 
-// Normaliza nome
+// Normaliza nome (igual ao scraper)
 function normalizarNome(nome) {
   if (!nome || typeof nome !== 'string') return '';
   return nome.trim().toLowerCase()
@@ -15,12 +18,11 @@ function normalizarNome(nome) {
     .replace(/^-+|-+$/g, '');
 }
 
-// Carrega dados
+// Carrega dados da planilha + Firebase
 async function carregarDados() {
   console.log('Iniciando carregamento...');
-
   try {
-    // Carrega planilha
+    // 1. Carrega planilha Google Sheets
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
@@ -29,12 +31,12 @@ async function carregarDados() {
     musicas = dataMusicas.values?.slice(1) || [];
     console.log('Planilha OK:', musicas.length, 'músicas');
 
-    // Aguarda Firebase estar pronto
+    // 2. Aguarda Firebase (agora garantido pelo index.html)
     if (!window.firebaseDb) {
       console.log('Aguardando Firebase...');
       await new Promise(resolve => {
         const check = setInterval(() => {
-          if (window.firebaseDb || window.firebaseReady === false) {
+          if (window.firebaseDb) {
             clearInterval(check);
             resolve();
           }
@@ -42,13 +44,12 @@ async function carregarDados() {
       });
     }
 
-    // Carrega do Firebase
+    // 3. Carrega letras/cifras do Firebase
     if (window.firebaseDb) {
       try {
         console.log('Acessando nó "musicas"...');
         const dbRef = ref(window.firebaseDb, 'musicas');
         const snapshot = await get(dbRef);
-
         if (snapshot.exists()) {
           const dados = snapshot.val();
           Object.keys(dados).forEach(chave => {
@@ -72,52 +73,53 @@ async function carregarDados() {
     filtrarEMostrar();
   } catch (err) {
     console.error('Erro geral:', err.message);
-    document.getElementById('resultados').innerHTML = 
-      '<p class="text-warning">Carregamento parcial. Tente "Limpar filtros".</p>';
+    document.getElementById('resultados').innerHTML = `
+      <div class="col-12 text-center py-5">
+        <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+        <p class="mt-3">Carregamento parcial. Tente "Limpar filtros".</p>
+      </div>`;
     preencherFiltros();
     filtrarEMostrar();
   }
 }
 
+// Preenche selects com opções únicas
 function preencherFiltros() {
   const selectArtista = document.getElementById('filtroArtista');
   const selectTom = document.getElementById('filtroTom');
   const selectData = document.getElementById('filtroData');
   const selectMusica = document.getElementById('filtroMusica');
 
-  // Limpa opções (mantém a primeira vazia)
+  // Limpa opções (mantém "Todos")
   [selectArtista, selectTom, selectData, selectMusica].forEach(sel => {
     while (sel.options.length > 1) sel.remove(1);
   });
 
-  // Artistas
+  // Artistas únicos
   [...new Set(musicas.map(m => m[2] || ''))]
-    .filter(Boolean)
-    .sort()
+    .filter(Boolean).sort()
     .forEach(art => {
       const opt = new Option(art, art);
       selectArtista.add(opt);
     });
 
-  // Tons
+  // Tons únicos
   [...new Set(musicas.map(m => m[1] || ''))]
-    .filter(Boolean)
-    .sort()
+    .filter(Boolean).sort()
     .forEach(tom => {
       const opt = new Option(tom, tom);
       selectTom.add(opt);
     });
 
-  // Datas
+  // Datas únicas (mais recente primeiro)
   [...new Set(musicas.map(m => m[4] || ''))]
-    .filter(Boolean)
-    .sort((a, b) => b.localeCompare(a))
+    .filter(Boolean).sort((a, b) => b.localeCompare(a))
     .forEach(dt => {
       const opt = new Option(dt, dt);
       selectData.add(opt);
     });
 
-  // Músicas
+  // Todas as músicas (alfabética)
   musicas
     .filter(m => m[0]?.trim())
     .sort((a, b) => (a[0] || '').localeCompare(b[0] || '', 'pt-BR'))
@@ -128,6 +130,7 @@ function preencherFiltros() {
     });
 }
 
+// Filtra e mostra resultados
 function filtrarEMostrar() {
   const musicaSelecionada = document.getElementById('filtroMusica')?.value || '';
   const nomeBusca = document.getElementById('filtroNome')?.value?.trim().toLowerCase() || '';
@@ -138,20 +141,19 @@ function filtrarEMostrar() {
 
   const resultadosFiltrados = musicas.filter(mus => {
     const [nomeMus, tomMus, art, link, dt] = mus || [];
-
     const matchMusica = !musicaSelecionada || nomeMus === musicaSelecionada;
     const matchNome = !nomeBusca || (nomeMus || '').toLowerCase().includes(nomeBusca);
     const matchArtista = !artista || art === artista;
     const matchTom = !tom || tomMus === tom;
     const matchData = !data || dt === data;
-
+    
     let matchLetra = true;
     if (letraBusca) {
       const chave = normalizarNome(nomeMus);
       const letraMus = dadosFirebaseMap.get(chave)?.letra || '';
       matchLetra = letraMus.toLowerCase().includes(letraBusca);
     }
-
+    
     return matchMusica && matchNome && matchArtista && matchTom && matchData && matchLetra;
   });
 
@@ -159,18 +161,23 @@ function filtrarEMostrar() {
   mostrarResultados(resultadosFiltrados);
 }
 
+// Renderiza cards das músicas
 function mostrarResultados(lista) {
   const container = document.getElementById('resultados');
   container.innerHTML = '';
 
   if (lista.length === 0) {
-    container.innerHTML = '<p class="text-center text-muted">Nenhuma música encontrada.</p>';
+    container.innerHTML = `
+      <div class="col-12 text-center py-5">
+        <i class="bi bi-music-note-beamed display-1 text-muted"></i>
+        <h4 class="mt-3 text-muted">Nenhuma música encontrada</h4>
+        <p>Tente ajustar os filtros ou limpar todos.</p>
+      </div>`;
     return;
   }
 
   lista.forEach(mus => {
     const [nomeMus, tom, artista, link, data] = mus || [];
-
     const chave = normalizarNome(nomeMus);
     const dadosFb = dadosFirebaseMap.get(chave) || { letra: 'Letra não encontrada', cifra: '' };
     const letra = dadosFb.letra;
@@ -183,61 +190,66 @@ function mostrarResultados(lista) {
     }
 
     const hasCifra = !!cifraLink?.trim();
+    const hasVideo = !!videoId;
 
     const card = document.createElement('div');
-    card.className = 'col-12';
+    card.className = 'col-12 col-lg-6 col-xl-4';
     card.innerHTML = `
-      <div class="card">
+      <div class="card musica-card h-100 shadow-lg">
         <div class="card-body">
-          <h5 class="card-title">${nomeMus || 'Sem nome'}</h5>
-          <p class="card-text">
-            <strong>Artista:</strong> ${artista || ''} <br>
-            <strong>Tom:</strong> ${tom || ''}
+          <h5 class="card-title fw-bold mb-1">${nomeMus}</h5>
+          <p class="card-text mb-2">
+            <i class="bi bi-person-fill me-1"></i><strong>Artista:</strong> ${artista || 'Não informado'}<br>
+            <i class="bi bi-music-note-list me-1"></i><strong>Tom:</strong> ${tom || 'Não informado'}
+            ${data ? `<br><i class="bi bi-calendar me-1"></i><small class="opacity-75">${data}</small>` : ''}
           </p>
           
-          <button class="btn btn-outline-primary btn-sm me-2" 
-                  onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">
-            Ver letra
-          </button>
-          <div class="letra-expand mt-2">${letra}</div>
-
-          ${videoId ? `
-            <button class="btn btn-outline-danger btn-sm mt-2 me-2" 
-                    onclick="this.nextElementSibling.innerHTML = '<div class=\\\'iframe-container\\\'><iframe src=\\\'https://www.youtube.com/embed/${videoId}\\\' frameborder=\\\'0\\\' allowfullscreen></iframe></div>'">
-              Ver vídeo
-            </button>
-            <div class="mt-3"></div>
+          ${hasVideo ? `
+            <iframe class="w-100 rounded mb-3" height="200" 
+                    src="https://www.youtube.com/embed/${videoId}" 
+                    title="${nomeMus}" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+            </iframe>
           ` : ''}
 
           ${hasCifra ? `
-            <button class="btn btn-outline-success btn-sm mt-2" 
-                    onclick="this.nextElementSibling.innerHTML = '<div class=\\\'iframe-container\\\'><iframe src=\\\'${encodeURIComponent(cifraLink)}\\\' frameborder=\\\'0\\\' allowfullscreen></iframe></div>'">
-              Ver cifra
-            </button>
-            <div class="mt-3"></div>
+            <div class="mb-3">
+              <a href="${cifraLink}" target="_blank" class="btn btn-light btn-sm w-100">
+                <i class="bi bi-guitar"></i> Ver Cifra Completa
+              </a>
+            </div>
           ` : ''}
+
+          <div class="letra" style="max-height: 300px; overflow-y: auto;">
+            ${letra}
+          </div>
+          
+          <div class="mt-3 pt-3 border-top border-white border-opacity-25 d-flex gap-2">
+            ${hasCifra ? `<span class="badge bg-light text-dark"><i class="bi bi-guitar"></i> Cifra OK</span>` : ''}
+            <span class="badge bg-light text-dark"><i class="bi bi-file-earmark-text"></i> Letra</span>
+          </div>
         </div>
-      </div>
-    `;
+      </div>`;
     container.appendChild(card);
   });
 }
 
-// Eventos
-document.getElementById('filtroMusica')?.addEventListener('change', filtrarEMostrar);
-document.getElementById('filtroNome')?.addEventListener('input', filtrarEMostrar);
-document.getElementById('filtroArtista')?.addEventListener('change', filtrarEMostrar);
-document.getElementById('filtroTom')?.addEventListener('change', filtrarEMostrar);
-document.getElementById('filtroLetra')?.addEventListener('input', filtrarEMostrar);
-document.getElementById('filtroData')?.addEventListener('change', filtrarEMostrar);
-
-document.getElementById('btnLimpar')?.addEventListener('click', () => {
-  ['filtroMusica', 'filtroNome', 'filtroArtista', 'filtroTom', 'filtroLetra', 'filtroData'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+// Limpa todos os filtros
+function limparFiltros() {
+  document.getElementById('filtroNome').value = '';
+  document.getElementById('filtroArtista').value = '';
+  document.getElementById('filtroTom').value = '';
+  document.getElementById('filtroData').value = '';
+  document.getElementById('filtroMusica').value = '';
+  document.getElementById('filtroLetra').value = '';
   filtrarEMostrar();
-});
+}
 
-// Inicia o carregamento
-carregarDados();
+// Auto-carrega ao inicializar
+document.addEventListener('DOMContentLoaded', carregarDados);
+
+// Listeners para filtros em tempo real
+['filtroNome', 'filtroArtista', 'filtroTom', 'filtroData', 'filtroMusica', 'filtroLetra'].forEach(id => {
+  document.getElementById(id).addEventListener('input', filtrarEMostrar);
+});
