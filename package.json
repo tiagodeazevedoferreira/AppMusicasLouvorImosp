@@ -9,6 +9,7 @@
   "dependencies": {
     "firebase": "^10.12.2",
     "google-spreadsheet": "^4.1.1",
+    "google-auth-library": "^9.14.2",
     "cheerio": "^1.0.0-rc.12",
     "node-fetch": "^3.3.2"
   }
