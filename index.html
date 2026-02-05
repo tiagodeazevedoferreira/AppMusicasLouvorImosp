@@ -1,3 +1,30 @@
+<!-- Firebase SDK -->
+<script type="module">
+  // Importa as funções necessárias
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // Configuração real do seu projeto (copiada do Firebase Console)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCBP39hlkjoWnaTYmfm0xUtwbc6C_BUKaY",
+    authDomain: "appmusicasimosp.firebaseapp.com",
+    databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com",
+    projectId: "appmusicasimosp",
+    storageBucket: "appmusicasimosp.firebasestorage.app",
+    messagingSenderId: "156285886894",
+    appId: "1:156285886894:web:e210931fcfd3b7dbbd283f"
+  };
+
+  // Inicializa o Firebase
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    window.firebaseDb = db;
+    console.log('Firebase inicializado com sucesso!');
+  } catch (err) {
+    console.error('Erro ao inicializar Firebase:', err.message);
+  }
+</script>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
