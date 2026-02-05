@@ -238,13 +238,15 @@ function mostrarResultados(lista) {
 // Limpa todos os filtros
 function limparFiltros() {
   document.getElementById('filtroNome').value = '';
-  document.getElementById('filtroArtista').value = '';
-  document.getElementById('filtroTom').value = '';
-  document.getElementById('filtroData').value = '';
-  document.getElementById('filtroMusica').value = '';
   document.getElementById('filtroLetra').value = '';
-  filtrarEMostrar();
+  document.getElementById('filtroArtista').selectedIndex = 0;
+  document.getElementById('filtroTom').selectedIndex = 0;
+  document.getElementById('filtroData').selectedIndex = 0;
+  document.getElementById('filtroMusica').selectedIndex = 0;
+  filtrarEMostrar();  // Reaplica filtros vazios
+  console.log('Filtros limpos!');
 }
+
 
 // Auto-carrega ao inicializar
 document.addEventListener('DOMContentLoaded', carregarDados);
