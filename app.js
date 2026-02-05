@@ -4,9 +4,9 @@ const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A';
 
 // Variáveis globais
 let musicas = [];
-let dadosFirebaseMap = new Map(); // chave normalizada → { letra, cifra }
+let dadosFirebaseMap = new Map();
 
-// Normaliza nome (igual ao script de migração)
+// Normaliza nome
 function normalizarNome(nome) {
   if (!nome || typeof nome !== 'string') return '';
   return nome.trim().toLowerCase()
@@ -15,23 +15,23 @@ function normalizarNome(nome) {
     .replace(/^-+|-+$/g, '');
 }
 
-// Carrega dados da planilha e tenta Firebase
+// Carrega dados
 async function carregarDados() {
-  console.log('Iniciando carregamento dos dados...');
+  console.log('Iniciando carregamento...');
 
   try {
-    // 1. Carrega músicas da planilha
+    // Carrega planilha
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
-    if (!resMusicas.ok) throw new Error(`Erro na planilha: ${resMusicas.status}`);
+    if (!resMusicas.ok) throw new Error(`Planilha: ${resMusicas.status}`);
     const dataMusicas = await resMusicas.json();
     musicas = dataMusicas.values?.slice(1) || [];
-    console.log('Planilha carregada:', musicas.length, 'músicas');
+    console.log('Planilha OK:', musicas.length, 'músicas');
 
-    // 2. Aguarda Firebase estar pronto
+    // Aguarda Firebase estar pronto
     if (!window.firebaseDb) {
-      console.log('Aguardando Firebase inicializar...');
+      console.log('Aguardando Firebase...');
       await new Promise(resolve => {
         const check = setInterval(() => {
           if (window.firebaseDb || window.firebaseReady === false) {
@@ -42,39 +42,38 @@ async function carregarDados() {
       });
     }
 
-    // 3. Carrega dados do Firebase
+    // Carrega do Firebase
     if (window.firebaseDb) {
       try {
+        console.log('Acessando nó "musicas"...');
         const dbRef = ref(window.firebaseDb, 'musicas');
         const snapshot = await get(dbRef);
 
         if (snapshot.exists()) {
           const dados = snapshot.val();
           Object.keys(dados).forEach(chave => {
-            const item = dados[chave];
             dadosFirebaseMap.set(chave, {
-              letra: item.letra || 'Letra não encontrada no Firebase',
-              cifra: item.cifra || ''
+              letra: dados[chave].letra || 'Letra não encontrada',
+              cifra: dados[chave].cifra || ''
             });
           });
-          console.log('Firebase carregado! Total de músicas:', dadosFirebaseMap.size);
+          console.log('Firebase OK! Total músicas:', dadosFirebaseMap.size);
         } else {
-          console.log('Nenhum dado encontrado no nó "musicas"');
+          console.log('Firebase: nó "musicas" vazio');
         }
       } catch (fbErr) {
-        console.error('Erro ao ler Firebase (continuando sem ele):', fbErr.message);
+        console.error('Erro ao ler Firebase:', fbErr.message);
       }
     } else {
-      console.warn('Firebase não inicializado');
+      console.warn('Firebase não disponível');
     }
 
-    // 4. Preenche filtros e mostra resultados
     preencherFiltros();
     filtrarEMostrar();
   } catch (err) {
-    console.error('Erro geral no carregamento:', err.message);
+    console.error('Erro geral:', err.message);
     document.getElementById('resultados').innerHTML = 
-      '<p class="text-warning">Carregamento parcial. Alguns dados podem estar indisponíveis. Tente limpar filtros.</p>';
+      '<p class="text-warning">Carregamento parcial. Tente "Limpar filtros".</p>';
     preencherFiltros();
     filtrarEMostrar();
   }
@@ -224,7 +223,7 @@ function mostrarResultados(lista) {
   });
 }
 
-// Eventos dos filtros
+// Eventos
 document.getElementById('filtroMusica')?.addEventListener('change', filtrarEMostrar);
 document.getElementById('filtroNome')?.addEventListener('input', filtrarEMostrar);
 document.getElementById('filtroArtista')?.addEventListener('change', filtrarEMostrar);

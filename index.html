@@ -1,35 +1,3 @@
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCBP39hlkjoWnaTYmfm0xUtwbc6C_BUKaY",
-    authDomain: "appmusicasimosp.firebaseapp.com",
-    databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com",
-    projectId: "appmusicasimosp",
-    storageBucket: "appmusicasimosp.firebasestorage.app",
-    messagingSenderId: "156285886894",
-    appId: "1:156285886894:web:e210931fcfd3b7dbbd283f"
-  };
-
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    window.firebaseDb = db;
-    window.firebaseReady = true; // Flag para indicar que está pronto
-    console.log('Firebase inicializado com sucesso!');
-    
-    // Dispara um evento para o app.js saber que pode começar
-    window.dispatchEvent(new Event('firebase-ready'));
-  } catch (err) {
-    console.error('Erro ao inicializar Firebase:', err.message);
-    window.firebaseReady = false;
-  }
-</script>
-
-<!-- Seu script principal (carrega DEPOIS do Firebase) -->
-<script src="app.js"></script>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -77,6 +45,34 @@
   </style>
 </head>
 <body>
+
+  <!-- Firebase SDK – carregado com try/catch e log -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCBP39hlkjoWnaTYmfm0xUtwbc6C_BUKaY",
+      authDomain: "appmusicasimosp.firebaseapp.com",
+      databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com",
+      projectId: "appmusicasimosp",
+      storageBucket: "appmusicasimosp.firebasestorage.app",
+      messagingSenderId: "156285886894",
+      appId: "1:156285886894:web:e210931fcfd3b7dbbd283f"
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      window.firebaseDb = db;
+      window.firebaseReady = true;
+      console.log('Firebase inicializado com sucesso!');
+      window.dispatchEvent(new Event('firebase-ready'));
+    } catch (err) {
+      console.error('Erro ao inicializar Firebase:', err.message);
+      window.firebaseReady = false;
+    }
+  </script>
 
   <div class="container">
     <h2 class="my-4 text-center">Catálogo de Músicas</h2>
