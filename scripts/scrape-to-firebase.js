@@ -1,30 +1,16 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set } from 'firebase/database';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
 // ────────────────────────────────────────────────
-// CONFIGURAÇÕES – ALTERE AQUI
+// CONFIGURAÇÕES – NÃO ALTERE AQUI
 // ────────────────────────────────────────────────
 
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
 
-// Credenciais de serviço (você cria uma Service Account no Google Cloud)
-const GOOGLE_SERVICE_ACCOUNT = {
-  type: "service_account",
-  project_id: process.env.GOOGLE_PROJECT_ID,
-  private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-  private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  client_email: process.env.GOOGLE_CLIENT_EMAIL,
-  client_id: process.env.GOOGLE_CLIENT_ID,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: process.env.GOOGLE_CLIENT_X509_CERT_URL
-};
-
-// Firebase config (pegue do seu projeto)
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A",
   authDomain: "appmusicasimosp.firebaseapp.com",
@@ -59,18 +45,16 @@ async function extrairCifra(url) {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Tenta pegar o container principal do Cifra Club
     let cifraText = $('.cifra').text() ||
                     $('.cifra-part').text() ||
                     $('[class*="cifra"]').first().text();
 
     if (cifraText) {
-      // Limpa um pouco
       cifraText = cifraText.trim().replace(/\n{3,}/g, '\n\n');
       return cifraText;
     }
 
-    return url; // fallback
+    return url;
   } catch (err) {
     console.error(`Falha ao extrair cifra de ${url}:`, err.message);
     return url;
@@ -88,10 +72,18 @@ async function main() {
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
 
-  // Inicializa Google Sheets com Service Account
+  // Autenticação com Service Account (versão 4.x)
+  const serviceAccountAuth = new JWT({
+    email: process.env.GOOGLE_CLIENT_EMAIL,
+    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+
   const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-  await doc.useServiceAccountAuth(GOOGLE_SERVICE_ACCOUNT);
+  doc.axios.defaults.headers.common.Authorization = `Bearer ${await serviceAccountAuth.authorize().then(r => r.access_token)}`;
+
   await doc.loadInfo();
+  console.log('Planilha carregada:', doc.title);
 
   // Carrega aba Músicas
   const musicasSheet = doc.sheetsByTitle['Músicas'];
@@ -101,7 +93,7 @@ async function main() {
   const letrasSheet = doc.sheetsByTitle['Letras'];
   const letrasRows = await letrasSheet.getRows();
 
-  // Mapa temporário de letras
+  // Mapa de letras
   const letrasMap = new Map();
   letrasRows.forEach(row => {
     const nome = row.get('Nome')?.trim().toLowerCase();
