@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
 // ────────────────────────────────────────────────
-// CONFIGURAÇÕES
+// CONFIGURAÇÕES – NÃO ALTERE AQUI
 // ────────────────────────────────────────────────
 
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
@@ -72,29 +72,31 @@ async function main() {
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
 
-  // Autenticação com JWT (forma correta v4.x)
+  // Autenticação correta para google-spreadsheet v4.x
   const auth = new JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL,
     key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
   // Cria a instância da planilha e autentica
   const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-  await doc.useServiceAccountAuth(auth); // ← método correto na v4.x
+  doc.auth = auth; // ← forma correta de setar a autenticação na v4.x
 
   await doc.loadInfo();
-  console.log('Planilha carregada:', doc.title);
+  console.log('Planilha carregada com sucesso:', doc.title);
 
   // Carrega aba Músicas
   const musicasSheet = doc.sheetsByTitle['Músicas'];
+  if (!musicasSheet) throw new Error('Aba "Músicas" não encontrada');
   const musicasRows = await musicasSheet.getRows();
 
   // Carrega aba Letras
   const letrasSheet = doc.sheetsByTitle['Letras'];
+  if (!letrasSheet) throw new Error('Aba "Letras" não encontrada');
   const letrasRows = await letrasSheet.getRows();
 
-  // Mapa de letras
+  // Mapa temporário de letras
   const letrasMap = new Map();
   letrasRows.forEach(row => {
     const nome = row.get('Nome')?.trim().toLowerCase();
