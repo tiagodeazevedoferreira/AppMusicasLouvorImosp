@@ -6,28 +6,43 @@ const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A';
 let musicas = [];
 let dadosFirebaseMap = new Map(); // chave normalizada → { letra, cifra }
 
-// Normalização de nome (exatamente igual ao script de migração)
+// Normaliza nome (igual ao script de migração)
 function normalizarNome(nome) {
   if (!nome || typeof nome !== 'string') return '';
   return nome.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')     // remove acentos
-    .replace(/[^a-z0-9]+/g, '-')                           // tudo que não é letra/número vira hífen
-    .replace(/^-+|-+$/g, '');                              // remove hífens no início/fim
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
-// Carrega dados
+// Carrega dados da planilha e tenta Firebase
 async function carregarDados() {
+  console.log('Iniciando carregamento dos dados...');
+
   try {
-    // Carrega músicas da planilha
+    // 1. Carrega músicas da planilha
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
     if (!resMusicas.ok) throw new Error(`Erro na planilha: ${resMusicas.status}`);
     const dataMusicas = await resMusicas.json();
     musicas = dataMusicas.values?.slice(1) || [];
-    console.log('Músicas da planilha carregadas:', musicas.length);
+    console.log('Planilha carregada:', musicas.length, 'músicas');
 
-    // Carrega do Firebase
+    // 2. Aguarda Firebase estar pronto
+    if (!window.firebaseDb) {
+      console.log('Aguardando Firebase inicializar...');
+      await new Promise(resolve => {
+        const check = setInterval(() => {
+          if (window.firebaseDb || window.firebaseReady === false) {
+            clearInterval(check);
+            resolve();
+          }
+        }, 200);
+      });
+    }
+
+    // 3. Carrega dados do Firebase
     if (window.firebaseDb) {
       try {
         const dbRef = ref(window.firebaseDb, 'musicas');
@@ -42,24 +57,24 @@ async function carregarDados() {
               cifra: item.cifra || ''
             });
           });
-          console.log('Firebase carregado com sucesso. Total de músicas:', dadosFirebaseMap.size);
+          console.log('Firebase carregado! Total de músicas:', dadosFirebaseMap.size);
         } else {
-          console.warn('Nenhum dado encontrado no nó "musicas"');
+          console.log('Nenhum dado encontrado no nó "musicas"');
         }
       } catch (fbErr) {
-        console.error('Erro ao acessar Firebase (continuando sem ele):', fbErr.message);
+        console.error('Erro ao ler Firebase (continuando sem ele):', fbErr.message);
       }
     } else {
-      console.warn('FirebaseDb não inicializado no window');
+      console.warn('Firebase não inicializado');
     }
 
+    // 4. Preenche filtros e mostra resultados
     preencherFiltros();
     filtrarEMostrar();
   } catch (err) {
-    console.error('Erro geral no carregamento:', err);
+    console.error('Erro geral no carregamento:', err.message);
     document.getElementById('resultados').innerHTML = 
-      '<p class="text-warning">Falha parcial no carregamento. Alguns dados podem estar indisponíveis. Tente "Limpar filtros".</p>';
-    // Continua com o que carregou
+      '<p class="text-warning">Carregamento parcial. Alguns dados podem estar indisponíveis. Tente limpar filtros.</p>';
     preencherFiltros();
     filtrarEMostrar();
   }
@@ -115,7 +130,6 @@ function preencherFiltros() {
 }
 
 function filtrarEMostrar() {
-  // Declara TODAS as variáveis no início para evitar ReferenceError
   const musicaSelecionada = document.getElementById('filtroMusica')?.value || '';
   const nomeBusca = document.getElementById('filtroNome')?.value?.trim().toLowerCase() || '';
   const artista = document.getElementById('filtroArtista')?.value || '';
@@ -210,7 +224,7 @@ function mostrarResultados(lista) {
   });
 }
 
-// Eventos
+// Eventos dos filtros
 document.getElementById('filtroMusica')?.addEventListener('change', filtrarEMostrar);
 document.getElementById('filtroNome')?.addEventListener('input', filtrarEMostrar);
 document.getElementById('filtroArtista')?.addEventListener('change', filtrarEMostrar);
@@ -226,5 +240,5 @@ document.getElementById('btnLimpar')?.addEventListener('click', () => {
   filtrarEMostrar();
 });
 
-// Inicia
+// Inicia o carregamento
 carregarDados();
