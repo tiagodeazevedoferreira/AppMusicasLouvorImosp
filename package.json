@@ -1,0 +1,15 @@
+{
+  "name": "musicas-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scrape": "node scripts/scrape-to-firebase.js"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2",
+    "google-spreadsheet": "^4.1.1",
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^3.3.2"
+  }
+}
