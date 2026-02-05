@@ -1,10 +1,8 @@
 <!-- Firebase SDK -->
 <script type="module">
-  // Importa tudo o que precisamos
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  // Configuração real do seu projeto
   const firebaseConfig = {
     apiKey: "AIzaSyCBP39hlkjoWnaTYmfm0xUtwbc6C_BUKaY",
     authDomain: "appmusicasimosp.firebaseapp.com",
@@ -15,16 +13,23 @@
     appId: "1:156285886894:web:e210931fcfd3b7dbbd283f"
   };
 
-  // Inicializa o Firebase
   try {
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     window.firebaseDb = db;
+    window.firebaseReady = true; // Flag para indicar que está pronto
     console.log('Firebase inicializado com sucesso!');
+    
+    // Dispara um evento para o app.js saber que pode começar
+    window.dispatchEvent(new Event('firebase-ready'));
   } catch (err) {
     console.error('Erro ao inicializar Firebase:', err.message);
+    window.firebaseReady = false;
   }
 </script>
+
+<!-- Seu script principal (carrega DEPOIS do Firebase) -->
+<script src="app.js"></script>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
