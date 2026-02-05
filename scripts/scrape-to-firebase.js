@@ -134,3 +134,5 @@ main().catch(err => {
   console.error('Erro na migração:', err.message);
   process.exit(1);
 });
+
+// Versão corrigida 2025-02-05 v2
