@@ -13,11 +13,35 @@
   <meta name="theme-color" content="#ffffff"/>
   
   <style>
-    body { padding: 15px; background-color: #f8f9fa; }
-    .card { margin-bottom: 20px; }
-    .letra-expand { display: none; white-space: pre-wrap; }
-    .iframe-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; }
-    .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    body { 
+      padding: 15px; 
+      background-color: #f8f9fa; 
+    }
+    .card { 
+      margin-bottom: 20px; 
+    }
+    .letra-expand { 
+      display: none; 
+      white-space: pre-wrap; 
+      background-color: #f1f3f5; 
+      padding: 10px; 
+      border-radius: 6px; 
+      margin-top: 10px;
+    }
+    .iframe-container { 
+      position: relative; 
+      padding-bottom: 56.25%; /* 16:9 aspect ratio */
+      height: 0; 
+      overflow: hidden; 
+      margin-top: 10px;
+    }
+    .iframe-container iframe { 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+    }
   </style>
 </head>
 <body>
@@ -27,6 +51,12 @@
 
     <!-- Filtros -->
     <div class="row g-3 mb-4">
+      <div class="col-md-6 col-12">
+        <label class="form-label">Selecionar Música</label>
+        <select id="filtroMusica" class="form-select">
+          <option value="">Todas as músicas</option>
+        </select>
+      </div>
       <div class="col-md-6 col-12">
         <label class="form-label">Nome da Música</label>
         <input type="text" id="filtroNome" class="form-control" placeholder="Digite o nome..."/>
@@ -47,6 +77,12 @@
           <option value="">Todas as datas</option>
         </select>
       </div>
+      <div class="col-md-6 col-12">
+        <label class="form-label">Tom</label>
+        <select id="filtroTom" class="form-select">
+          <option value="">Todos os tons</option>
+        </select>
+      </div>
 
       <!-- Botão Limpar -->
       <div class="col-12 mt-3">
@@ -54,14 +90,14 @@
       </div>
     </div>
 
-    <!-- Resultados -->
+    <!-- Área de resultados -->
     <div id="resultados" class="row"></div>
   </div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
   
-  <!-- Seu script -->
+  <!-- Seu script principal -->
   <script src="app.js"></script>
 
   <!-- Registro do Service Worker para PWA -->
@@ -69,7 +105,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('Service Worker registrado!', reg))
+          .then(reg => console.log('Service Worker registrado com sucesso!', reg))
           .catch(err => console.log('Falha ao registrar Service Worker:', err));
       });
     }

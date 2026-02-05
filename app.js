@@ -6,14 +6,12 @@ let letrasMap = new Map(); // nome -> letra
 
 async function carregarDados() {
   try {
-    // Carrega aba Músicas (agora com coluna extra Cifra)
     const resMusicas = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas?key=${API_KEY}`
     );
     const dataMusicas = await resMusicas.json();
     musicas = dataMusicas.values.slice(1); // remove cabeçalho
 
-    // Carrega aba Letras (sem mudança)
     const resLetras = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Letras?key=${API_KEY}`
     );
@@ -31,9 +29,8 @@ async function carregarDados() {
 }
 
 function preencherFiltros() {
+  // Artistas
   const artistasUnicos = [...new Set(musicas.map(m => m[2]))].sort();
-  const datasUnicas = [...new Set(musicas.map(m => m[4]))].sort().reverse();
-
   const selectArtista = document.getElementById('filtroArtista');
   artistasUnicos.forEach(art => {
     const opt = document.createElement('option');
@@ -42,6 +39,20 @@ function preencherFiltros() {
     selectArtista.appendChild(opt);
   });
 
+  // Tons (novo!)
+  const tonsUnicos = [...new Set(musicas.map(m => m[1]))]
+    .filter(t => t && t.trim() !== '') // remove vazios
+    .sort(); // ordena alfabeticamente (C, C#, D, etc.)
+  const selectTom = document.getElementById('filtroTom');
+  tonsUnicos.forEach(tom => {
+    const opt = document.createElement('option');
+    opt.value = tom;
+    opt.textContent = tom;
+    selectTom.appendChild(opt);
+  });
+
+  // Datas
+  const datasUnicas = [...new Set(musicas.map(m => m[4]))].sort().reverse();
   const selectData = document.getElementById('filtroData');
   datasUnicas.forEach(dt => {
     const opt = document.createElement('option');
@@ -49,19 +60,36 @@ function preencherFiltros() {
     opt.textContent = dt;
     selectData.appendChild(opt);
   });
+
+  // Músicas
+  const musicasValidas = musicas
+    .filter(m => m && m[0] && typeof m[0] === 'string' && m[0].trim() !== '')
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+  const selectMusica = document.getElementById('filtroMusica');
+  musicasValidas.forEach(mus => {
+    const nomeMus = mus[0].trim();
+    const opt = document.createElement('option');
+    opt.value = nomeMus;
+    opt.textContent = nomeMus;
+    selectMusica.appendChild(opt);
+  });
 }
 
 function filtrarEMostrar() {
+  const musicaSelecionada = document.getElementById('filtroMusica').value;
   const nome = document.getElementById('filtroNome').value.trim().toLowerCase();
   const artista = document.getElementById('filtroArtista').value;
+  const tom = document.getElementById('filtroTom').value; // novo filtro
   const letra = document.getElementById('filtroLetra').value.trim().toLowerCase();
   const data = document.getElementById('filtroData').value;
 
   const resultadosFiltrados = musicas.filter(mus => {
-    const [nomeMus, tom, art, link, dt, cifra] = mus; // Adicionada cifra (índice 5)
+    const [nomeMus, tomMus, art, link, dt, cifra] = mus;
 
+    const matchMusica = !musicaSelecionada || nomeMus === musicaSelecionada;
     const matchNome = !nome || nomeMus.toLowerCase().includes(nome);
     const matchArtista = !artista || art === artista;
+    const matchTom = !tom || tomMus === tom; // novo
     const matchData = !data || dt === data;
 
     let matchLetra = true;
@@ -70,9 +98,10 @@ function filtrarEMostrar() {
       matchLetra = letraMus.toLowerCase().includes(letra);
     }
 
-    return matchNome && matchArtista && matchData && matchLetra;
+    return matchMusica && matchNome && matchArtista && matchTom && matchData && matchLetra;
   });
 
+  resultadosFiltrados.sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
   mostrarResultados(resultadosFiltrados);
 }
 
@@ -86,17 +115,15 @@ function mostrarResultados(lista) {
   }
 
   lista.forEach(mus => {
-    const [nomeMus, tom, artista, link, data, cifraLink] = mus; // Adicionada cifraLink
+    const [nomeMus, tom, artista, link, data, cifraLink] = mus;
     const letra = letrasMap.get(nomeMus.trim().toLowerCase()) || 'Letra não encontrada';
 
-    // Extrai ID do YouTube
     let videoId = '';
     if (link) {
       const match = link.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
       videoId = match ? match[1] : '';
     }
 
-    // Verifica se há link de cifra válido
     const hasCifra = cifraLink && typeof cifraLink === 'string' && cifraLink.trim().startsWith('http');
 
     const card = document.createElement('div');
@@ -139,19 +166,23 @@ function mostrarResultados(lista) {
 }
 
 // Eventos de filtro
+document.getElementById('filtroMusica').addEventListener('change', filtrarEMostrar);
 document.getElementById('filtroNome').addEventListener('input', filtrarEMostrar);
 document.getElementById('filtroArtista').addEventListener('change', filtrarEMostrar);
+document.getElementById('filtroTom').addEventListener('change', filtrarEMostrar); // novo
 document.getElementById('filtroLetra').addEventListener('input', filtrarEMostrar);
 document.getElementById('filtroData').addEventListener('change', filtrarEMostrar);
 
 // Botão Limpar filtros
 document.getElementById('btnLimpar').addEventListener('click', () => {
+  document.getElementById('filtroMusica').value = '';
   document.getElementById('filtroNome').value = '';
   document.getElementById('filtroArtista').value = '';
+  document.getElementById('filtroTom').value = ''; // novo
   document.getElementById('filtroLetra').value = '';
   document.getElementById('filtroData').value = '';
   filtrarEMostrar();
 });
 
-// Inicia o carregamento
+// Inicia
 carregarDados();
