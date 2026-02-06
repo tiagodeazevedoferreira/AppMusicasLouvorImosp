@@ -4,9 +4,8 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { JWT } from 'google-auth-library';
 
-// CONFIGS
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const SHEET_NAME = 'Músicas'; // Aba única
+const SHEET_NAME = 'Músicas';
 
 const FIREBASE_CONFIG = {
   apiKey: process.env.FIREBASE_API_KEY || "AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A",
@@ -35,9 +34,9 @@ async function extrairCifra(url) {
   }
 }
 
-// 🔥 SHEETS API DIRETA (sem google-spreadsheet)
 async function getMusicas(authToken) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}?key=${process.env.GOOGLE_API_KEY || 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A'}`;
+  // ✅ SEM API_KEY - só JWT Bearer
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}`;
   
   const res = await fetch(url, {
     headers: {
@@ -46,21 +45,18 @@ async function getMusicas(authToken) {
     }
   });
 
-  if (!res.ok) throw new Error(`Sheets API: ${res.status}`);
+  if (!res.ok) throw new Error(`Sheets API: ${res.status} - ${await res.text()}`);
   const { values } = await res.json();
   
-  // Pula header, pega [Música, Tom, Artista, ?, Data, Cifra]
   return values.slice(1).filter(row => row[0]?.trim());
 }
 
 async function main() {
   console.log('🎵 IMOSP SCRAPER v4 - Sheets API Nativa');
   
-  // Firebase
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
 
-  // JWT para Sheets (sem bibliotecas externas)
   const jwt = new JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL,
     key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
@@ -68,9 +64,8 @@ async function main() {
   });
 
   const { access_token } = await jwt.authorize();
-  console.log('🔑 Autenticado Google Sheets');
+  console.log('🔑 JWT OK');
 
-  // 🔥 BUSCA DADOS
   const musicas = await getMusicas(access_token);
   console.log('📊 Músicas:', musicas.length);
 
@@ -95,10 +90,10 @@ async function main() {
     saved++;
   }
 
-  console.log(`🎉 ${saved} músicas salvas no Firebase!`);
+  console.log(`🎉 ${saved} salvas!`);
 }
 
 main().catch(err => {
-  console.error('💥 ERRO:', err.message);
+  console.error('💥', err.message);
   process.exit(1);
 });
