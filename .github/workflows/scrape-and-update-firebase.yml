@@ -1,9 +1,9 @@
 name: Migração Letras e Cifras para Firebase
 
 on:
-  workflow_dispatch:    # Executa manualmente
+  workflow_dispatch:    # Manual
   schedule:
-    - cron: '0 3 * * 1'   # Toda segunda-feira às 03:00 UTC (00:00 -03)
+    - cron: '0 3 * * 1' # Segunda 03:00 UTC (00:00 -03)
 
 jobs:
   scrape-and-update:
@@ -23,10 +23,16 @@ jobs:
 
       - name: Run scraper
         env:
+          # Google Service Account (Sheets)
           GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
           GOOGLE_PRIVATE_KEY_ID: ${{ secrets.GOOGLE_PRIVATE_KEY_ID }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_X509_CERT_URL: ${{ secrets.GOOGLE_CLIENT_X509_CERT_URL }}
+          # Firebase (novo scraper)
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: npm run scrape
