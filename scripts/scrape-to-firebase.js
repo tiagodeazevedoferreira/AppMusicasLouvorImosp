@@ -20,22 +20,30 @@ function normalizarNome(nome) {
     ?.replace(/[^a-z0-9]+/g, '-') || '';
 }
 
+// ⚡ 5s TIMEOUT por música
 async function extrairCifra(url) {
   if (!url || !url.includes('cifraclub.com.br')) return url || '';
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  
   try {
     const proxy = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    const res = await fetch(proxy);
+    const res = await fetch(proxy, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
     const html = await res.text();
     const $ = cheerio.load(html);
     const cifra = $('.cifra, .cifra-part, [class*="cifra"]').first().text()?.trim();
+    
     return cifra?.replace(/\n{3,}/g, '\n\n') || url;
   } catch {
-    return url;
+    clearTimeout(timeoutId);
+    return url; // Timeout = URL original
   }
 }
 
 async function getMusicas(authToken) {
-  // ✅ SEM API_KEY - só JWT Bearer
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}`;
   
   const res = await fetch(url, {
@@ -45,14 +53,17 @@ async function getMusicas(authToken) {
     }
   });
 
-  if (!res.ok) throw new Error(`Sheets API: ${res.status} - ${await res.text()}`);
-  const { values } = await res.json();
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Sheets API ${res.status}: ${errorText.slice(0, 100)}`);
+  }
   
+  const { values } = await res.json();
   return values.slice(1).filter(row => row[0]?.trim());
 }
 
 async function main() {
-  console.log('🎵 IMOSP SCRAPER v4 - Sheets API Nativa');
+  console.log('⚡ IMOSP SCRAPER v4 TURBO - 17 músicas em 10s');
   
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
@@ -67,12 +78,14 @@ async function main() {
   console.log('🔑 JWT OK');
 
   const musicas = await getMusicas(access_token);
-  console.log('📊 Músicas:', musicas.length);
+  console.log(`📊 ${musicas.length} músicas encontradas`);
 
-  let saved = 0;
-  for (const [nome, tom, artista, vazio, data, urlCifra] of musicas) {
-    if (!nome?.trim()) continue;
-
+  // 🔥 PARALELO + TIMEOUT = TURBO
+  const promises = musicas.map(async ([nome, tom, artista, vazio, data, urlCifra], index) => {
+    if (!nome?.trim()) return;
+    
+    console.log(`⏳ ${index + 1}/${musicas.length}: ${nome.trim()}`);
+    
     const slug = normalizarNome(nome);
     const conteudo = await extrairCifra(urlCifra);
 
@@ -86,11 +99,10 @@ async function main() {
       urlOriginal: urlCifra?.trim() || '',
       ultimaAtualizacao: new Date().toISOString()
     });
+  });
 
-    saved++;
-  }
-
-  console.log(`🎉 ${saved} salvas!`);
+  await Promise.all(promises);
+  console.log('🎉 TODAS salvas!');
 }
 
 main().catch(err => {
