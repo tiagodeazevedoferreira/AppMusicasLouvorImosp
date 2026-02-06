@@ -12,7 +12,7 @@
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   
-  <!-- Ícones locais (ajustados) -->
+  <!-- Ícones locais -->
   <link rel="icon" type="image/jpeg" sizes="192x192" href="icon-192.jpg">
   <link rel="icon" type="image/jpeg" sizes="512x512" href="icon-512.jpg">
   
@@ -22,62 +22,65 @@
     .musica-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; margin-bottom: 15px; }
     .letra { background: rgba(255,255,255,0.95); color: #333; padding: 20px; border-radius: 10px; font-family: 'Georgia', serif; line-height: 1.8; white-space: pre-wrap; }
     .filtros { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px; }
+    #resultados { min-height: 400px; }
   </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
   
-  <!-- Header -->
+  <!-- Header com LOGO GARANTIDO -->
   <header class="bg-primary text-white text-center py-4 app-card mx-3 mt-3">
-    <img src="Imosp.jpg" alt="IMOSP" class="img-fluid" style="height: 60px; width: auto; border-radius: 10px;">
-    <h1 class="mb-2">Catálogo de Músicas</h1>
+    <img src="Imosp.jpg" alt="IMOSP" class="img-fluid mb-2" 
+         style="height: 60px; width: auto; border-radius: 10px; max-width: 200px;" 
+         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+    <div style="display:none;">
+      <i class="bi bi-building-church display-4 mb-2"></i>
+    </div>
+    <h1 class="mb-1 fw-bold">Catálogo de Músicas</h1>
     <p class="mb-0">Louvor e Adoração IMOSP</p>
   </header>
 
-  <!-- Filtros -->
+  <!-- Filtros SIMPLIFICADOS -->
   <main class="container-fluid my-4 px-3 flex-grow-1">
     <div class="row justify-content-center">
       <div class="col-12 col-lg-10">
         <div class="filtros shadow-lg p-4 mb-4">
           <div class="row g-3">
             <div class="col-md-6 col-lg-3">
-              <label class="form-label fw-bold">Nome da Música</label>
+              <label class="form-label fw-bold">Buscar no Nome</label>
               <input type="text" class="form-control" id="filtroNome" placeholder="Digite parte do nome...">
             </div>
+            
             <div class="col-md-6 col-lg-3">
+              <label class="form-label fw-bold">Música</label>
+              <select class="form-select" id="filtroMusica">
+                <option value="">Todas</option>
+              </select>
+            </div>
+            
+            <div class="col-md-6 col-lg-2">
               <label class="form-label fw-bold">Artista</label>
               <select class="form-select" id="filtroArtista">
                 <option value="">Todos</option>
               </select>
             </div>
-            <div class="col-md-6 col-lg-2">
-              <label class="form-label fw-bold">Tom</label>
-              <select class="form-select" id="filtroTom">
-                <option value="">Todos</option>
-              </select>
-            </div>
+            
             <div class="col-md-6 col-lg-2">
               <label class="form-label fw-bold">Data</label>
               <select class="form-select" id="filtroData">
                 <option value="">Todas</option>
               </select>
             </div>
-            <div class="col-md-6 col-lg-2">
-              <label class="form-label fw-bold">Música Específica</label>
-              <select class="form-select" id="filtroMusica">
-                <option value="">Todas</option>
-              </select>
-            </div>
+            
             <div class="col-12">
               <label class="form-label fw-bold">Buscar na Letra</label>
               <input type="text" class="form-control" id="filtroLetra" placeholder="Trecho da letra...">
             </div>
+            
+            <!-- SOMENTE BOTÃO LIMPAR -->
             <div class="col-12">
-              <div class="d-flex gap-2 flex-wrap">
-                <button class="btn btn-primary flex-fill" onclick="filtrarEMostrar()">
-                  <i class="bi bi-search"></i> Filtrar
-                </button>
-                <button class="btn btn-outline-secondary flex-fill" onclick="limparFiltros()">
-                  <i class="bi bi-arrow-clockwise"></i> Limpar
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-outline-secondary px-4 py-2" onclick="limparFiltros()">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Limpar
                 </button>
               </div>
             </div>
@@ -102,7 +105,7 @@
     <p class="mb-0">&copy; 2026 IMOSP - AppMusicasLouvor</p>
   </footer>
 
-  <!-- Firebase SDK (inicialização) -->
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
     import { getDatabase } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
