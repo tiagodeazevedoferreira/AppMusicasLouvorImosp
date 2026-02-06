@@ -1,3 +1,4 @@
+// COLE ISTO NOVAMENTE (versão FINAL sem aba "Letras")
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 import { initializeApp } from 'firebase/app';
@@ -5,7 +6,6 @@ import { getDatabase, ref, set } from 'firebase/database';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
-// CONFIGURAÇÕES
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
 
 const FIREBASE_CONFIG = {
@@ -18,7 +18,6 @@ const FIREBASE_CONFIG = {
   appId: "SEU_APP_ID_AQUI"
 };
 
-// FUNÇÕES AUXILIARES
 function normalizarNome(nome) {
   if (!nome) return '';
   return nome.trim().toLowerCase()
@@ -27,93 +26,77 @@ function normalizarNome(nome) {
 }
 
 async function extrairCifra(url) {
-  if (!url || !url.includes('cifraclub.com.br')) {
-    return url || '';
-  }
-
+  if (!url || !url.includes('cifraclub.com.br')) return url || '';
   try {
     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
     if (!response.ok) throw new Error(`Status ${response.status}`);
-
     const html = await response.text();
     const $ = cheerio.load(html);
-
-    let cifraText = $('.cifra').text() ||
-                   $('.cifra-part').text() ||
-                   $('[class*="cifra"]').first().text();
-
+    let cifraText = $('.cifra').text() || $('.cifra-part').text() || $('[class*="cifra"]').first().text();
     if (cifraText) {
-      cifraText = cifraText.trim().replace(/\n{3,}/g, '\n\n');
-      return cifraText;
+      return cifraText.trim().replace(/\n{3,}/g, '\n\n');
     }
-
     return url;
   } catch (err) {
-    console.error(`Falha ao extrair cifra de ${url}:`, err.message);
+    console.error(`Cifra falhou ${url}:`, err.message);
     return url;
   }
 }
 
-// EXECUÇÃO PRINCIPAL
 async function main() {
-  console.log('🚀 Iniciando migração para Firebase...');
-
-  // Inicializa Firebase
+  console.log('🚀 Iniciando migração...');
+  
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
 
-  // Autenticação Service Account
   const serviceAccountAuth = new JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
   const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
   doc.axios.defaults.headers.common.Authorization = `Bearer ${await serviceAccountAuth.authorize().then(r => r.access_token)}`;
-
+  
   await doc.loadInfo();
-  console.log('📊 Planilha carregada:', doc.title);
+  console.log('📊 Planilha:', doc.title);
 
-  // ✅ SÓ ABA "Músicas" (sem exigir "Letras")
+  // ❌ SEMPRE só aba "Músicas"
   const musicasSheet = doc.sheetsByTitle['Músicas'];
-  if (!musicasSheet) {
-    throw new Error('❌ Aba "Músicas" não encontrada!');
-  }
+  if (!musicasSheet) throw new Error('❌ Aba "Músicas" não encontrada!');
+  
   const musicasRows = await musicasSheet.getRows();
-  console.log('🎵 Músicas encontradas:', musicasRows.length);
+  console.log('🎵 Músicas:', musicasRows.length);
 
-  let contador = 0;
+  let saved = 0;
   for (const row of musicasRows) {
     const nome = row.get('Música')?.trim();
     if (!nome) continue;
 
     const nomeNormalizado = normalizarNome(nome);
     const cifraLink = row.get('Cifra')?.trim() || '';
-
-    // Letra padrão (sem aba Letras)
-    const letra = 'Letra não encontrada na planilha. Adicione manualmente no Firebase.';
+    
+    // Letra placeholder (edite depois no Firebase)
+    const letra = 'Letra não encontrada na planilha. Edite no Firebase Console.';
 
     const cifra = await extrairCifra(cifraLink);
 
-    // Salva no Firebase
-    const caminho = `musicas/${nomeNormalizado}`;
-    await set(ref(db, caminho), {
+    await set(ref(db, `musicas/${nomeNormalizado}`), {
       nomeOriginal: nome,
       letra,
       cifra,
       ultimaAtualizacao: new Date().toISOString()
     });
 
-    contador++;
-    console.log(`✅ ${contador}/${musicasRows.length} Salvo: ${nomeNormalizado}`);
+    saved++;
+    console.log(`✅ ${saved}/${musicasRows.length}: ${nomeNormalizado}`);
   }
 
-  console.log(`🎉 Migração concluída! ${contador} músicas salvas no Firebase.`);
+  console.log(`🎉 FINALIZADO! ${saved} músicas salvas.`);
 }
 
 main().catch(err => {
-  console.error('❌ Erro na migração:', err.message);
+  console.error('❌ ERRO:', err.message);
   process.exit(1);
 });
