@@ -60,20 +60,33 @@ async function carregarDados() {
   }
 }
 
+// ✅ PREENCHE FILTROS SEM DUPLICATAS
 function preencherFiltros() {
-  const selects = {
-    filtroArtista: musicas.map(m => m[2] || '').filter(Boolean).sort(),
-    filtroData: musicas.map(m => m[4] || '').filter(Boolean).sort((a,b) => b.localeCompare(a)),
-    filtroMusica: musicas.filter(m => m[0]?.trim()).map(m => m[0].trim()).sort((a,b) => a.localeCompare(b, 'pt-BR'))
-  };
+  // Artistas únicos
+  const artistasUnicos = [...new Set(musicas.map(m => m[2]).filter(Boolean))].sort();
+  preencherSelect('filtroArtista', artistasUnicos);
 
-  Object.entries(selects).forEach(([id, lista]) => {
-    const select = document.getElementById(id);
-    while (select.options.length > 1) select.remove(1);
-    lista.forEach(valor => {
-      const opt = new Option(valor, valor);
-      select.add(opt);
-    });
+  // Datas ÚNICAS (CORRIGIDO: Set + filter + sort)
+  const datasRaw = musicas.map(m => m[4]).filter(Boolean); // Remove vazios PRIMEIRO
+  const datasUnicas = [...new Set(datasRaw)].sort((a, b) => b.localeCompare(a, 'pt-BR')); // Set remove duplicatas
+  preencherSelect('filtroData', datasUnicas);
+  console.log('📅 Datas únicas:', datasUnicas.length, datasUnicas.slice(0,5)); // Debug
+
+  // Músicas únicas
+  const musicasUnicas = musicas
+    .filter(m => m[0]?.trim())
+    .map(m => m[0].trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  preencherSelect('filtroMusica', musicasUnicas);
+}
+
+function preencherSelect(id, lista) {
+  const select = document.getElementById(id);
+  while (select.options.length > 1) select.remove(1);
+  lista.forEach(valor => {
+    const opt = new Option(valor, valor);
+    select.add(opt);
   });
 }
 
@@ -148,7 +161,7 @@ function mostrarResultados(lista) {
   }).join('');
 }
 
-// LIMPAR FUNCIONAL 100%
+// LIMPAR FUNCIONAL
 function limparFiltros() {
   document.getElementById('filtroNome').value = '';
   document.getElementById('filtroLetra').value = '';
@@ -159,11 +172,11 @@ function limparFiltros() {
   console.log('🧹 Filtros limpos!');
 }
 
-// Inicialização + LISTENERS AUTOMÁTICOS
+// Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   carregarDados();
   
-  // FILTRO EM TEMPO REAL (sem botão!)
+  // Filtros automáticos
   ['filtroNome', 'filtroLetra'].forEach(id => {
     document.getElementById(id).addEventListener('input', filtrarEMostrar);
   });
