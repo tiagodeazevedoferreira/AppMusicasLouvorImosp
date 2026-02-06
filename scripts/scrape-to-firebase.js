@@ -5,26 +5,17 @@ import { getDatabase, ref, set } from 'firebase/database';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
-// ────────────────────────────────────────────────
-// CONFIGURAÇÕES – NÃO ALTERE AQUI
-// ────────────────────────────────────────────────
-
+// CONFIGS
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A",
   authDomain: "appmusicasimosp.firebaseapp.com",
   databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com",
   projectId: "appmusicasimosp",
-  storageBucket: "appmusicasimosp.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID_AQUI", // substitua se tiver
-  appId: "SEU_APP_ID_AQUI" // substitua se tiver
+  storageBucket: "appmusicasimosp.appspot.com"
 };
 
-// ────────────────────────────────────────────────
-// FUNÇÕES AUXILIARES
-// ────────────────────────────────────────────────
-
+// NORMALIZAÇÃO
 function normalizarNome(nome) {
   if (!nome) return '';
   return nome.trim().toLowerCase()
@@ -32,107 +23,120 @@ function normalizarNome(nome) {
     .replace(/[^a-z0-9]+/g, '-');
 }
 
-async function extrairCifra(url) {
-  if (!url || !url.includes('cifraclub.com.br')) {
-    return url || '';
-  }
+// 🔑 EXTRAI LETRA/CIFRA da coluna Cifra (CifraClub, YouTube, etc)
+async function extrairConteudo(url) {
+  if (!url) return '';
 
+  console.log(`📥 Buscando conteúdo: ${url}`);
+  
   try {
+    // CifraClub - extrai letra + cifra
+    if (url.includes('cifraclub.com.br')) {
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      // Tenta pegar letra/cifra
+      let conteudo = $('.cifra').text() ||
+                    $('.cifra-part').text() ||
+                    $('[class*="cifra"]').first().text() ||
+                    $('.letra').text() ||
+                    $('.lyrics').text();
+
+      if (conteudo) {
+        conteudo = conteudo.trim().replace(/\n{3,}/g, '\n\n');
+        console.log('✅ Letra/cifra extraída do CifraClub');
+        return conteudo;
+      }
+    }
+    
+    // YouTube - só link (não dá pra extrair letra)
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      console.log('ℹ️ YouTube detectado (link mantido)');
+      return url;
+    }
+    
+    // Outros links - tenta como texto simples
     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error(`Status ${response.status}`);
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    let cifraText = $('.cifra').text() ||
-                    $('.cifra-part').text() ||
-                    $('[class*="cifra"]').first().text();
-
-    if (cifraText) {
-      cifraText = cifraText.trim().replace(/\n{3,}/g, '\n\n');
-      return cifraText;
+    if (response.ok) {
+      const text = await response.text();
+      console.log('ℹ️ Link externo mantido');
+      return url;
     }
-
-    return url;
+    
   } catch (err) {
-    console.error(`Falha ao extrair cifra de ${url}:`, err.message);
-    return url;
+    console.error(`❌ Falha ${url}:`, err.message);
   }
+  
+  return url || 'Conteúdo não encontrado';
 }
 
-// ────────────────────────────────────────────────
-// EXECUÇÃO PRINCIPAL
-// ────────────────────────────────────────────────
-
+// 🚀 EXECUÇÃO PRINCIPAL (SÓ ABA MÚSICAS)
 async function main() {
-  console.log('Iniciando migração para Firebase...');
-
-  // Inicializa Firebase
+  console.log('🎵 SCRAPER IMOSP - Só aba "Músicas"');
+  
   const app = initializeApp(FIREBASE_CONFIG);
   const db = getDatabase(app);
 
-  // Autenticação correta para google-spreadsheet v4.x
-  const auth = new JWT({
+  const serviceAccountAuth = new JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL,
-    key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
-  // Cria a instância da planilha e autentica
   const doc = new GoogleSpreadsheet(SPREADSHEET_ID);
-  doc.auth = auth; // ← forma correta de setar a autenticação na v4.x
-
+  doc.axios.defaults.headers.common.Authorization = `Bearer ${await serviceAccountAuth.authorize().then(r => r.access_token)}`;
+  
   await doc.loadInfo();
-  console.log('Planilha carregada com sucesso:', doc.title);
+  console.log('📊 Planilha:', doc.title);
+  
+  console.log('📋 Abas disponíveis:', doc.sheetsByIndex.map(s => s.title).join(', '));
 
-  // Carrega aba Músicas
+  // ✅ APENAS aba "Músicas"
   const musicasSheet = doc.sheetsByTitle['Músicas'];
-  if (!musicasSheet) throw new Error('Aba "Músicas" não encontrada');
+  if (!musicasSheet) {
+    throw new Error('❌ Aba "Músicas" não encontrada! Verifique nome exato.');
+  }
+  
   const musicasRows = await musicasSheet.getRows();
+  console.log('🎼 Músicas encontradas:', musicasRows.length);
 
-  // Carrega aba Letras
-  const letrasSheet = doc.sheetsByTitle['Letras'];
-  if (!letrasSheet) throw new Error('Aba "Letras" não encontrada');
-  const letrasRows = await letrasSheet.getRows();
+  let processadas = 0;
+  let comCifra = 0;
 
-  // Mapa temporário de letras
-  const letrasMap = new Map();
-  letrasRows.forEach(row => {
-    const nome = row.get('Nome')?.trim().toLowerCase();
-    const letra = row.get('Letra')?.trim();
-    if (nome && letra) letrasMap.set(nome, letra);
-  });
-
-  // Processa cada música
   for (const row of musicasRows) {
     const nome = row.get('Música')?.trim();
     if (!nome) continue;
 
     const nomeNormalizado = normalizarNome(nome);
-    const cifraLink = row.get('Cifra')?.trim() || '';
+    const colunaCifra = row.get('Cifra')?.trim() || '';
 
-    const letra = letrasMap.get(nome.toLowerCase()) || 'Letra não encontrada';
-    const cifra = await extrairCifra(cifraLink);
+    const conteudo = await extrairConteudo(colunaCifra);
+    if (conteudo !== colunaCifra) comCifra++;
 
-    // Salva no Firebase
-    const caminho = `musicas/${nomeNormalizado}`;
-    await set(ref(db, caminho), {
+    // Salva TUDO no Firebase
+    await set(ref(db, `musicas/${nomeNormalizado}`), {
       nomeOriginal: nome,
-      letra,
-      cifra,
+      letra: conteudo.includes('cifra') || conteudo.includes('CifraClub') ? conteudo : 'Letra não encontrada',
+      cifra: conteudo,
+      urlOriginal: colunaCifra,
       ultimaAtualizacao: new Date().toISOString()
     });
 
-    console.log(`Salvo: ${nomeNormalizado}`);
+    processadas++;
+    if (processadas % 10 === 0) console.log(`⏳ ${processadas}/${musicasRows.length}`);
   }
 
-  console.log('Migração concluída com sucesso!');
+  console.log(`🎉 FINALIZADO!`);
+  console.log(`✅ ${processadas} músicas processadas`);
+  console.log(`🎸 ${comCifra} com letra/cifra extraída`);
 }
 
 main().catch(err => {
-  console.error('Erro na migração:', err.message);
+  console.error('💥 ERRO:', err.message);
   process.exit(1);
 });
-
-// Versão corrigida 2025-02-05 v2
