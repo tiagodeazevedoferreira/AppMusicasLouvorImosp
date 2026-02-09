@@ -1,4 +1,4 @@
-// DEBUG OPCIONAL (igual)
+// DEBUG OPCIONAL
 if (process.env.GOOGLESERVICEACCOUNTJSON) {
   console.log('DEBUG SECRET - Iniciando debugging...');
   console.log('Secret exists:', !!process.env.GOOGLESERVICEACCOUNTJSON);
@@ -21,9 +21,9 @@ import puppeteer from 'puppeteer';
 
 console.log('Iniciando scrape GSheet -> Cifra Club -> Firebase...');
 
-// CONFIGS - ABA CORRETA
+// CONFIGS
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const SHEET_NAME = 'Músicas';  // ← CORRIGIDO: Nome exato da aba principal
+const SHEET_NAME = 'Músicas';  // ← Nome correto da aba
 const RANGE = `${SHEET_NAME}!F:F`;
 const FIREBASE_PATH = 'musicas';
 
@@ -56,13 +56,6 @@ async function getCifraClubUrls() {
   
   const sheets = google.sheets({ version: 'v4', auth });
   
-  // DEBUG: Listar abas (manter por enquanto)
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-  console.log('Abas disponíveis:');
-  spreadsheet.data.sheets.forEach(sheet => {
-    console.log(`- "${sheet.properties.title}" (ID: ${sheet.properties.sheetId})`);
-  });
-  
   console.log('Usando range:', RANGE);
   
   const res = await sheets.spreadsheets.values.get({
@@ -74,14 +67,14 @@ async function getCifraClubUrls() {
   console.log('Total linhas:', rows.length);
   
   const urls = rows
-    ?.slice(1)  // Pula header
+    ?.slice(1)
     ?.map(row => row[0]?.toString().trim())
     ?.filter(url => url && url.includes('cifraclub.com.br'));
   console.log(urls?.length || 0, 'URLs encontrados');
   return urls || [];
 }
 
-// scrapeCifra (igual)
+// SCRAPING - COM LETRA + CIFRA
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 async function scrapeCifra(url) {
@@ -89,19 +82,33 @@ async function scrapeCifra(url) {
   try {
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage', 
+        '--disable-accelerated-2d-canvas', 
+        '--no-first-run', 
+        '--no-zygote'
+      ]
     });
+    
     const page = await browser.newPage();
     await page.setUserAgent(userAgent);
     await page.setViewport({ width: 1366, height: 768 });
     
+    console.log(`  → Acessando ${url}`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 40000 });
-    await page.waitForSelector('h1, .fc-title, .cifra-content, pre', { timeout: 10000 });
+    
+    await page.waitForSelector('h1, .fc-title, .cifra-content, pre, .letra', { timeout: 10000 });
     
     const data = await page.evaluate(() => {
+      // Title
       const title = document.querySelector('h1.fc-title, h1, title')?.innerText?.trim() || '';
+      
+      // Artist  
       const artist = document.querySelector('.fc-artist a, .artist')?.innerText?.trim() || '';
       
+      // Cifra (primeiro match com acordes)
       const cifraEls = document.querySelectorAll('.fc-chords, .cifra-content, pre, [class*="cifra"], [class*="chord"]');
       let cifra = '';
       for (const el of cifraEls) {
@@ -111,19 +118,42 @@ async function scrapeCifra(url) {
           break;
         }
       }
-      return { title, artist, cifra };
+      
+      // Letra (texto longo SEM acordes)
+      const letraEls = document.querySelectorAll('.letra, .lyrics, p, div[class*="letra"], [class*="lyrics"]');
+      let letra = '';
+      for (const el of letraEls) {
+        const text = el.innerText?.trim();
+        if (text && text.length > 100 && !/[A-G][b#]?/.test(text.slice(0, 100))) {
+          letra = text;
+          break;
+        }
+      }
+      
+      return { title, artist, cifra, letra };
     });
     
     await browser.close();
-    return data.cifra ? { url, title: data.title.trim(), artist: data.artist.trim(), cifra: data.cifra.trim() } : null;
+    
+    const result = {
+      url, 
+      title: data.title.trim(), 
+      artist: data.artist.trim(),
+      cifra: data.cifra.trim() || 'Cifra não encontrada',
+      letra: data.letra.trim() || 'Letra não encontrada'
+    };
+    
+    console.log(`  ✓ OK: ${data.title} (${data.cifra ? 'Cifra+Letra' : 'Só título'})`);
+    return result;
+    
   } catch (error) {
-    console.error(`${url}:`, error.message);
+    console.error(`  ✗ ERRO ${url}:`, error.message);
     if (browser) await browser.close();
     return null;
   }
 }
 
-// saveMusicas (igual)
+// FIREBASE
 async function saveMusicas(musicas) {
   if (!firebaseConfig.projectId) {
     console.log('AVISO: Sem config Firebase - pulando save');
@@ -131,11 +161,19 @@ async function saveMusicas(musicas) {
   }
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  await set(ref(db, FIREBASE_PATH), musicas);
-  console.log(`${musicas.length} salvas em ${FIREBASE_PATH}`);
+  
+  // Salva com chave normalizada por título
+  const musicasNormalizadas = {};
+  musicas.forEach(musica => {
+    const chave = musicas.find(c => c.title === musica.title)?.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    musicasNormalizadas[chave] = musica;
+  });
+  
+  await set(ref(db, FIREBASE_PATH), musicasNormalizadas);
+  console.log(`${Object.keys(musicasNormalizadas).length} salvas em ${FIREBASE_PATH}`);
 }
 
-// MAIN (igual)
+// MAIN
 async function main() {
   try {
     const urls = await getCifraClubUrls();
@@ -143,15 +181,21 @@ async function main() {
       console.log('Sem URLs na planilha');
       return;
     }
+    
     const musicas = [];
     for (let i = 0; i < urls.length; i++) {
-      console.log(`${i + 1}/${urls.length}: ${urls[i]}`);
+      console.log(`${i + 1}/${urls.length}:`);
       const musica = await scrapeCifra(urls[i]);
       if (musica) musicas.push(musica);
-      if (i < urls.length - 1) await new Promise(r => setTimeout(r, 3000));
+      
+      if (i < urls.length - 1) {
+        console.log('Aguardando 3s...\n');
+        await new Promise(r => setTimeout(r, 3000));
+      }
     }
+    
     await saveMusicas(musicas);
-    console.log(`${musicas.length}/${urls.length} OK!`);
+    console.log(`\n🎉 ${musicas.length}/${urls.length} OK!`);
   } catch (error) {
     console.error('ERRO:', error.message);
     process.exit(1);
