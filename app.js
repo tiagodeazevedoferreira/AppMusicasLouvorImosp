@@ -66,11 +66,11 @@ function preencherFiltros() {
   const artistasUnicos = [...new Set(musicas.map(m => m[2]).filter(Boolean))].sort();
   preencherSelect('filtroArtista', artistasUnicos);
 
-  // Datas ÚNICAS (CORRIGIDO: Set + filter + sort)
-  const datasRaw = musicas.map(m => m[4]).filter(Boolean); // Remove vazios PRIMEIRO
-  const datasUnicas = [...new Set(datasRaw)].sort((a, b) => b.localeCompare(a, 'pt-BR')); // Set remove duplicatas
+  // Datas ÚNICAS
+  const datasRaw = musicas.map(m => m[4]).filter(Boolean);
+  const datasUnicas = [...new Set(datasRaw)].sort((a, b) => b.localeCompare(a, 'pt-BR'));
   preencherSelect('filtroData', datasUnicas);
-  console.log('📅 Datas únicas:', datasUnicas.length, datasUnicas.slice(0,5)); // Debug
+  console.log('📅 Datas únicas:', datasUnicas.length, datasUnicas.slice(0,5));
 
   // Músicas únicas
   const musicasUnicas = musicas
@@ -161,8 +161,8 @@ function mostrarResultados(lista) {
   }).join('');
 }
 
-// LIMPAR FUNCIONAL
-function limparFiltros() {
+// LIMPAR FUNCIONAL – Exposta no window para funcionar com onclick
+window.limparFiltros = function limparFiltros() {
   // Limpa os campos de texto
   document.getElementById('filtroNome').value = '';
   document.getElementById('filtroLetra').value = '';
@@ -172,16 +172,15 @@ function limparFiltros() {
   selects.forEach(id => {
     const select = document.getElementById(id);
     if (select) {
-      select.value = '';           // Mais confiável que selectedIndex
-      // Alternativa extra: força a opção 0
-      select.selectedIndex = 0;
+      select.value = '';           // Mais confiável
+      select.selectedIndex = 0;    // Fallback
     }
   });
 
   // Atualiza a exibição
   filtrarEMostrar();
   console.log('🧹 Filtros limpos com sucesso!');
-}
+};
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
