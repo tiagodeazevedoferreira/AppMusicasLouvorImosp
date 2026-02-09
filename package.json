@@ -1,16 +1,20 @@
 {
-  "name": "musicas-scraper",
+  "name": "scraper-cifraclub",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
+  "description": "Scraper GSheet → Cifra Club → Firebase",
+  "main": "scrape.js",
   "scripts": {
-    "scrape": "node scripts/scrape-to-firebase.js"
+    "start": "node scrape.js",
+    "test": "node scrape.js"
   },
   "dependencies": {
+    "googleapis": "^140.0.0",
     "firebase": "^10.12.2",
-    "google-spreadsheet": "^4.1.1",
-    "google-auth-library": "^9.14.2",
-    "cheerio": "^1.0.0-rc.12",
-    "node-fetch": "^3.3.2"
+    "puppeteer": "^23.0.2",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
