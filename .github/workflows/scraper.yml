@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
 
       - name: Instalar dependências
-        run: npm ci
+        run: npm install
 
       - name: Configurar Google Credentials
         run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
