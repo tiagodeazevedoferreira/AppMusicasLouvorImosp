@@ -1,23 +1,25 @@
-name: Scraper GSheet → Firebase (22h diário)
+name: Scraper Cifra Club (22h diário)
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # 22h São Paulo = 01h UTC
-  workflow_dispatch:  # permite rodar manualmente
+    - cron: '0 1 * * *'  # 22h SP = 01h UTC
+  workflow_dispatch:  # botão manual no GitHub
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Instalar dependências
+        run: npm ci
 
       - name: Configurar Google Credentials
         run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
@@ -30,4 +32,3 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
         run: node scrape.js
-.github/
