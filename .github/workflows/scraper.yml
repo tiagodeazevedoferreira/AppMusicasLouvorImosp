@@ -8,7 +8,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # ← ADICIONADO: evita timeout infinito
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -23,13 +23,22 @@ jobs:
         run: npm install
 
       - name: Configurar Google Credentials
-        run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' | jq . > credentials.json
+        # ↑ CORRIGIDO: | jq . remove aspas/quebra YAML, garante JSON válido
+
+      - name: Verificar credentials.json (Debug)
+        run: |
+          echo "Tamanho do credentials.json: $(wc -c < credentials.json) bytes"
+          head -n 5 credentials.json
+          echo "..." 
 
       - name: Executar scraper
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ./credentials.json
+          GOOGLESERVICEACCOUNTJSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_PROJECT_ID: appmusicasimosp
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}  # ← CORRIGIDO: secret específico
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}  # ← Adicione este secret!
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
         run: node scrap.js
