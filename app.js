@@ -163,13 +163,24 @@ function mostrarResultados(lista) {
 
 // LIMPAR FUNCIONAL
 function limparFiltros() {
+  // Limpa os campos de texto
   document.getElementById('filtroNome').value = '';
   document.getElementById('filtroLetra').value = '';
-  ['filtroMusica', 'filtroArtista', 'filtroData'].forEach(id => {
-    document.getElementById(id).selectedIndex = 0;
+
+  // Reseta todos os selects para a primeira opção (value = "")
+  const selects = ['filtroMusica', 'filtroArtista', 'filtroData'];
+  selects.forEach(id => {
+    const select = document.getElementById(id);
+    if (select) {
+      select.value = '';           // Mais confiável que selectedIndex
+      // Alternativa extra: força a opção 0
+      select.selectedIndex = 0;
+    }
   });
+
+  // Atualiza a exibição
   filtrarEMostrar();
-  console.log('🧹 Filtros limpos!');
+  console.log('🧹 Filtros limpos com sucesso!');
 }
 
 // Inicialização
