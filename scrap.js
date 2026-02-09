@@ -1,4 +1,4 @@
-// DEBUG OPCIONAL - Só roda se env existir
+// DEBUG OPCIONAL (igual)
 if (process.env.GOOGLESERVICEACCOUNTJSON) {
   console.log('DEBUG SECRET - Iniciando debugging...');
   console.log('Secret exists:', !!process.env.GOOGLESERVICEACCOUNTJSON);
@@ -8,7 +8,6 @@ if (process.env.GOOGLESERVICEACCOUNTJSON) {
     console.log('SUCCESS - Project ID:', creds.project_id, 'Client Email:', creds.client_email);
   } catch (e) {
     console.error('JSON ERROR:', e.message);
-    console.error('Primeiros 200 chars:', process.env.GOOGLESERVICEACCOUNTJSON?.substring(0, 200));
     process.exit(1);
   }
   console.log('DEBUG END');
@@ -22,9 +21,9 @@ import puppeteer from 'puppeteer';
 
 console.log('Iniciando scrape GSheet -> Cifra Club -> Firebase...');
 
-// CONFIGS
+// CONFIGS - RANGE CORRIGIDO
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const SHEET_NAME = 'Página1';
+const SHEET_NAME = 'Página 1';  // ← CORRIGIDO: "Página 1" (com espaço, comum)
 const RANGE = `${SHEET_NAME}!F:F`;
 const FIREBASE_PATH = 'musicas';
 
@@ -38,30 +37,39 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID,
 };
 
-// GOOGLE SHEETS - FALLBACK LOCAL
+// GOOGLE SHEETS - COM LISTA DE ABAS PARA DEBUG
 async function getCifraClubUrls() {
   console.log('Lendo planilha...');
   
   let auth;
   if (process.env.GOOGLESERVICEACCOUNTJSON) {
-    // GH Actions mode
     auth = new GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLESERVICEACCOUNTJSON),
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
   } else {
-    // Local mode - usa service account file
     auth = new GoogleAuth({
-      keyFilename: './credentials.json',  // Crie este arquivo localmente
+      keyFilename: './credentials.json',
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
   }
   
   const sheets = google.sheets({ version: 'v4', auth });
+  
+  // DEBUG: Listar abas
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  console.log('Abas disponíveis:');
+  spreadsheet.data.sheets.forEach(sheet => {
+    console.log(`- "${sheet.properties.title}" (ID: ${sheet.properties.sheetId})`);
+  });
+  
+  console.log('Tentando range:', RANGE);
+  
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: RANGE,
   });
+  
   const rows = res.data.values;
   const urls = rows
     ?.slice(1)
@@ -71,7 +79,7 @@ async function getCifraClubUrls() {
   return urls || [];
 }
 
-// SCRAPING (igual à versão anterior)
+// scrapeCifra, saveMusicas, main (iguais às versões anteriores)
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 async function scrapeCifra(url) {
@@ -79,14 +87,7 @@ async function scrapeCifra(url) {
   try {
     browser = await puppeteer.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote'
-      ]
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-accelerated-2d-canvas', '--no-first-run', '--no-zygote']
     });
     const page = await browser.newPage();
     await page.setUserAgent(userAgent);
@@ -108,13 +109,11 @@ async function scrapeCifra(url) {
           break;
         }
       }
-      
       return { title, artist, cifra };
     });
     
     await browser.close();
     return data.cifra ? { url, title: data.title.trim(), artist: data.artist.trim(), cifra: data.cifra.trim() } : null;
-    
   } catch (error) {
     console.error(`${url}:`, error.message);
     if (browser) await browser.close();
@@ -122,7 +121,6 @@ async function scrapeCifra(url) {
   }
 }
 
-// FIREBASE
 async function saveMusicas(musicas) {
   if (!firebaseConfig.projectId) {
     console.log('AVISO: Sem config Firebase - pulando save');
@@ -134,7 +132,6 @@ async function saveMusicas(musicas) {
   console.log(musicas.length, 'salvas em', FIREBASE_PATH);
 }
 
-// MAIN
 async function main() {
   try {
     const urls = await getCifraClubUrls();
@@ -147,10 +144,7 @@ async function main() {
       console.log(`${i + 1}/${urls.length}:`, urls[i]);
       const musica = await scrapeCifra(urls[i]);
       if (musica) musicas.push(musica);
-      
-      if (i < urls.length - 1) {
-        await new Promise(r => setTimeout(r, 3000));
-      }
+      if (i < urls.length - 1) await new Promise(r => setTimeout(r, 3000));
     }
     await saveMusicas(musicas);
     console.log(`${musicas.length}/${urls.length} OK!`);
