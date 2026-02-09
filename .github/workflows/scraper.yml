@@ -1,13 +1,12 @@
 name: Scraper Cifra Club (22h diário)
-
 on:
   schedule:
     - cron: '0 1 * * *'  # 22h SP = 01h UTC
   workflow_dispatch:
-
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # ← ADICIONADO: evita timeout infinito
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,17 +15,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # SEM cache = resolve conflito npm ci
 
       - name: Instalar dependências
-        run: npm install  # ← npm install sempre funciona
+        run: npm install
 
       - name: Configurar Google Credentials
         run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
 
       - name: Executar scraper
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: credentials.json
+          GOOGLE_APPLICATION_CREDENTIALS: ./credentials.json  # ← ./ adicionado
           FIREBASE_PROJECT_ID: appmusicasimosp
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
