@@ -2,8 +2,8 @@ name: Scraper Cifra Club (22h diário)
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # 22h SP = 01h UTC
-  workflow_dispatch:  # botão manual no GitHub
+    - cron: '0 1 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -19,7 +19,7 @@ jobs:
           cache: 'npm'
 
       - name: Instalar dependências
-        run: npm install
+        run: npm install  # ← MUDANÇA AQUI!
 
       - name: Configurar Google Credentials
         run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
