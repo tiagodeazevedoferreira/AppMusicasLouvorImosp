@@ -1,29 +1,19 @@
 name: Scraper Cifra Club (22h diário)
-
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1 * * *'  # 22h SP
   workflow_dispatch:
-
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'none'   # ← DESABILITA CACHE PROBLEMÁTICO
-
-      - name: Instalar dependências
-        run: npm install
-
-      - name: Configurar Google Credentials
-        run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
-
+          cache: 'none'  # ← CRÍTICO: resolve npm ci
+      - run: npm install  # ← npm install (não ci!)
+      - run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" > credentials.json
       - name: Executar scraper
         env:
           GOOGLE_APPLICATION_CREDENTIALS: credentials.json
@@ -31,4 +21,4 @@ jobs:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-        run: node scrape.js
+        run: node scrap.js  # ← scrap.js (seu nome!)
