@@ -1,12 +1,15 @@
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth } from 'googleapis/build/src/google';
 import { google } from 'googleapis';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set } from 'firebase/database';
 import puppeteer from 'puppeteer';
-import dotenv from 'dotenv';
 
+console.log('🚀 Iniciando scrape GSheet → Cifra Club → Firebase...');
+
+// === CONFIGS ===
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const RANGE = 'Página1!F:F';
+const SHEET_NAME = 'Página1'; // ajuste se necessário
+const RANGE = `${SHEET_NAME}!F:F`;
 const FIREBASE_PATH = 'musicas';
 
 const firebaseConfig = {
@@ -19,97 +22,106 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID,
 };
 
-async function getUrlsCifraClub() {
+// === 1. GOOGLE SHEETS ===
+async function getCifraClubUrls() {
+  console.log('📊 Lendo planilha Google Sheets...');
+  
   const auth = new GoogleAuth({
-    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    keyFilename: './credentials.json', // gerado pelo workflow
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
 
   const sheets = google.sheets({ version: 'v4', auth });
-  const response = await sheets.spreadsheets.values.get({
+  const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: RANGE,
   });
 
-  const values = response.data.values || [];
-  const urls = values
+  const rows = res.data.values || [];
+  const urls = rows
     .slice(1) // pula header
-    .map(row => row[0]?.trim())
+    .map(row => row[0]?.toString().trim())
     .filter(url => url && url.includes('cifraclub.com.br'));
 
-  console.log(`Encontradas ${urls.length} URLs do Cifra Club.`);
+  console.log(`✅ ${urls.length} URLs válidos encontrados`);
   return urls;
 }
 
-async function scrapeCifraClub(url) {
-  const browser = await puppeteer.launch({ headless: 'new' });
+// === 2. SCRAPING CIFRA CLUB ===
+async function scrapeCifra(url) {
+  const browser = await puppeteer.launch({ 
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] // GitHub Actions
+  });
+  
   try {
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
-
-    // Extrai seletor específico do Cifra Club (testado na estrutura atual)
-    const cifraData = await page.evaluate(() => {
-      // Letra/cifra principal (acordes + letra)
-      const cifraContent = document.querySelector('.js-cifra-content')?.innerText || 
-                          Array.from(document.querySelectorAll('.cifra-verse, .cifra-chorus, .cifra-bridge')).map(el => el.innerText).join('\n') ||
-                          document.querySelector('pre')?.innerText || '';
-
-      // Metadados
-      const title = document.querySelector('h1')?.innerText || '';
-      const artist = document.querySelector('[data-artist]')?.getAttribute('data-artist') || 
-                    document.querySelector('.artist-name')?.innerText || '';
-
-      return {
-        url,
-        title,
-        artist,
-        cifra: cifraContent.trim()
-      };
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    const data = await page.evaluate(() => {
+      // Título e artista
+      const title = document.querySelector('h1.fc-title')?.innerText || '';
+      const artist = document.querySelector('.fc-artist a')?.innerText || '';
+      
+      // Cifra/Letra (seletores Cifra Club 2026)
+      const cifraEl = document.querySelector('.fc-chords') || 
+                     document.querySelector('.cifra-content') ||
+                     document.querySelector('pre');
+      const cifra = cifraEl ? cifraEl.innerText : '';
+      
+      return { url, title: title.trim(), artist: artist.trim(), cifra: cifra.trim() };
     });
 
-    return cifraData;
-  } finally {
     await browser.close();
+    return data.cifra ? data : null;
+  } catch (error) {
+    console.error(`❌ Erro scraping ${url}:`, error.message);
+    await browser.close();
+    return null;
   }
 }
 
+// === 3. FIREBASE ===
 async function saveMusicas(musicas) {
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  const musicasRef = ref(db, FIREBASE_PATH);
-
-  await set(musicasRef, musicas);
-  console.log(`✅ ${musicas.length} músicas salvas em Firebase/${FIREBASE_PATH}`);
+  
+  await set(ref(db, FIREBASE_PATH), musicas);
+  console.log(`✅ ${musicas.length} músicas salvas em /${FIREBASE_PATH}`);
 }
 
+// === EXECUÇÃO ===
 async function main() {
   try {
-    console.log('🚀 Iniciando scrape GSheet → Cifra Club → Firebase...');
-    
-    const urls = await getUrlsCifraClub();
+    const urls = await getCifraClubUrls();
+    if (urls.length === 0) {
+      console.log('⚠️ Nenhuma URL encontrada na planilha');
+      return;
+    }
+
+    console.log('🎸 Iniciando scraping das cifras...');
     const musicas = [];
-
-    // Processa cada URL (com delay para não sobrecarregar)
+    
     for (let i = 0; i < urls.length; i++) {
-      console.log(`📖 Scraping ${i + 1}/${urls.length}: ${urls[i]}`);
-      const musica = await scrapeCifraClub(urls[i]);
+      console.log(`[${i+1}/${urls.length}] ${urls[i]}`);
+      const musica = await scrapeCifra(urls[i]);
       
-      if (musica.cifra) {
+      if (musica) {
         musicas.push(musica);
-        console.log(`✅ ${musica.title || 'Música'} capturada`);
-      } else {
-        console.log(`⚠️ Sem cifra encontrada em ${urls[i]}`);
+        console.log(`  ✅ ${musica.title} - ${musica.artist}`);
       }
-
-      // Delay 2s entre requests
-      if (i < urls.length - 1) await new Promise(r => setTimeout(r, 2000));
+      
+      // Rate limit: 3s entre requests
+      if (i < urls.length - 1) {
+        await new Promise(r => setTimeout(r, 3000));
+      }
     }
 
     await saveMusicas(musicas);
-    console.log(`🎉 Processo concluído! ${musicas.length}/${urls.length} músicas processadas.`);
-    process.exit(0);
+    console.log(`🎉 FINALIZADO: ${musicas.length}/${urls.length} sucessos`);
+
   } catch (error) {
-    console.error('❌ Erro:', error.message);
+    console.error('💥 ERRO FATAL:', error.message);
     process.exit(1);
   }
 }
