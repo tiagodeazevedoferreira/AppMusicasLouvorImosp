@@ -1,12 +1,15 @@
 name: Scraper Cifra Club (22h diário)
+
 on:
   schedule:
-    - cron: '0 1 * * *'  # 22h SP = 01h UTC
+    - cron: '0 1 * * *' # 22h SP = 01h UTC
   workflow_dispatch:
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # ← ADICIONADO: evita timeout infinito
+    timeout-minutes: 30 # ← ADICIONADO: evita timeout infinito
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,9 +27,9 @@ jobs:
 
       - name: Executar scraper
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: ./credentials.json  # ← ./ adicionado
+          GOOGLE_APPLICATION_CREDENTIALS: ./credentials.json
           FIREBASE_PROJECT_ID: appmusicasimosp
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}  # ← CORRIGIDO: secret específico
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
         run: node scrap.js
