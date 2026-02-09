@@ -21,9 +21,9 @@ import puppeteer from 'puppeteer';
 
 console.log('Iniciando scrape GSheet -> Cifra Club -> Firebase...');
 
-// CONFIGS - RANGE CORRIGIDO
+// CONFIGS - ABA CORRETA
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const SHEET_NAME = 'Página 1';  // ← CORRIGIDO: "Página 1" (com espaço, comum)
+const SHEET_NAME = 'Músicas';  // ← CORRIGIDO: Nome exato da aba principal
 const RANGE = `${SHEET_NAME}!F:F`;
 const FIREBASE_PATH = 'musicas';
 
@@ -37,7 +37,7 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID,
 };
 
-// GOOGLE SHEETS - COM LISTA DE ABAS PARA DEBUG
+// GOOGLE SHEETS
 async function getCifraClubUrls() {
   console.log('Lendo planilha...');
   
@@ -56,30 +56,32 @@ async function getCifraClubUrls() {
   
   const sheets = google.sheets({ version: 'v4', auth });
   
-  // DEBUG: Listar abas
+  // DEBUG: Listar abas (manter por enquanto)
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
   console.log('Abas disponíveis:');
   spreadsheet.data.sheets.forEach(sheet => {
     console.log(`- "${sheet.properties.title}" (ID: ${sheet.properties.sheetId})`);
   });
   
-  console.log('Tentando range:', RANGE);
+  console.log('Usando range:', RANGE);
   
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: RANGE,
   });
   
-  const rows = res.data.values;
+  const rows = res.data.values || [];
+  console.log('Total linhas:', rows.length);
+  
   const urls = rows
-    ?.slice(1)
+    ?.slice(1)  // Pula header
     ?.map(row => row[0]?.toString().trim())
     ?.filter(url => url && url.includes('cifraclub.com.br'));
   console.log(urls?.length || 0, 'URLs encontrados');
   return urls || [];
 }
 
-// scrapeCifra, saveMusicas, main (iguais às versões anteriores)
+// scrapeCifra (igual)
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 async function scrapeCifra(url) {
@@ -121,6 +123,7 @@ async function scrapeCifra(url) {
   }
 }
 
+// saveMusicas (igual)
 async function saveMusicas(musicas) {
   if (!firebaseConfig.projectId) {
     console.log('AVISO: Sem config Firebase - pulando save');
@@ -129,9 +132,10 @@ async function saveMusicas(musicas) {
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   await set(ref(db, FIREBASE_PATH), musicas);
-  console.log(musicas.length, 'salvas em', FIREBASE_PATH);
+  console.log(`${musicas.length} salvas em ${FIREBASE_PATH}`);
 }
 
+// MAIN (igual)
 async function main() {
   try {
     const urls = await getCifraClubUrls();
@@ -141,7 +145,7 @@ async function main() {
     }
     const musicas = [];
     for (let i = 0; i < urls.length; i++) {
-      console.log(`${i + 1}/${urls.length}:`, urls[i]);
+      console.log(`${i + 1}/${urls.length}: ${urls[i]}`);
       const musica = await scrapeCifra(urls[i]);
       if (musica) musicas.push(musica);
       if (i < urls.length - 1) await new Promise(r => setTimeout(r, 3000));
