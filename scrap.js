@@ -1,5 +1,23 @@
-import { GoogleAuth } from 'google-auth-library';
-import { google } from 'googleapis';
+// === DEBUG SECRET ===
+console.log('🔍 DEBUGGING SECRET...');
+console.log('Secret exists:', !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+console.log('Secret length:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.length);
+
+try {
+  const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  console.log('✅ SUCCESS:', creds.project_id, creds.client_email);
+} catch (e) {
+  console.error('❌ JSON ERROR:', e.message);
+  console.error('Primeiros 200 chars:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.substring(0, 200));
+  process.exit(1);
+}
+console.log('🔍 DEBUG END\n');
+
+
+
+
+import { GoogleAuth } from 'google-auth-library';  // ✅ CORRETO
+import { google } from 'googleapis';               // ✅ CORRETO
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set } from 'firebase/database';
 import puppeteer from 'puppeteer';
@@ -8,6 +26,8 @@ console.log('🚀 Iniciando scrape GSheet → Cifra Club → Firebase...');
 
 // === CONFIGS ===
 const SPREADSHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
+const SHEET_NAME = 'Página1';
+const RANGE = `${SHEET_NAME}!F:F`;
 const FIREBASE_PATH = 'musicas';
 
 const firebaseConfig = {
@@ -20,22 +40,92 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID,
 };
 
-// === TESTE - URLs FIXAS (pula Google Sheets bug) ===
+// === GOOGLE SHEETS ===
 async function getCifraClubUrls() {
-  console.log('🧪 MODO TESTE - 5 URLs fixas de louvor');
-  return [
-    'https://www.cifraclub.com.br/fernandinho/grato/',
-    'https://www.cifraclub.com.br/diante-do-trono/mande-um-fogo-novo/',
-    'https://www.cifraclub.com.br/aline-barros/risos/',
-    'https://www.cifraclub.com.br/thalles-roberto/nada-surpreende-deus/',
-    'https://www.cifraclub.com.br/isadora-pompeo/nao-estou-so/'
-  ];
+  console.log('📊 Lendo planilha...');
+  
+  const auth = new GoogleAuth({
+    keyFilename: './credentials.json',
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+
+  const sheets = google.sheets({ version: 'v4', auth });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: RANGE,
+  });
+
+  const rows = res.data.values || [];
+  const urls = rows
+    .slice(1)
+    .map(row => row[0]?.toString().trim())
+    .filter(url => url && url.includes('cifraclub.com.br'));
+
+  console.log(`✅ ${urls.length} URLs encontrados`);
+  return urls;
 }
 
-// === SCRAPING CIFRA CLUB ===
+// === SCRAPING ===
 async function scrapeCifra(url) {
-  console.log(`📖 Scraping: ${url}`);
-  
   const browser = await puppeteer.launch({ 
     headless: true,
-    args: ['--no-sandbox
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    const data = await page.evaluate(() => {
+      const title = document.querySelector('h1.fc-title')?.innerText || '';
+      const artist = document.querySelector('.fc-artist a')?.innerText || '';
+      const cifraEl = document.querySelector('.fc-chords, .cifra-content, pre');
+      const cifra = cifraEl ? cifraEl.innerText : '';
+      
+      return { url, title: title.trim(), artist: artist.trim(), cifra: cifra.trim() };
+    });
+
+    await browser.close();
+    return data.cifra ? data : null;
+  } catch (error) {
+    console.error(`❌ ${url}:`, error.message);
+    await browser.close();
+    return null;
+  }
+}
+
+// === FIREBASE ===
+async function saveMusicas(musicas) {
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  await set(ref(db, FIREBASE_PATH), musicas);
+  console.log(`✅ ${musicas.length} salvas em /${FIREBASE_PATH}`);
+}
+
+// === MAIN ===
+async function main() {
+  try {
+    const urls = await getCifraClubUrls();
+    if (!urls.length) {
+      console.log('⚠️ Sem URLs na planilha');
+      return;
+    }
+
+    const musicas = [];
+    for (let i = 0; i < urls.length; i++) {
+      console.log(`[${i+1}/${urls.length}] ${urls[i]}`);
+      const musica = await scrapeCifra(urls[i]);
+      if (musica) musicas.push(musica);
+      
+      if (i < urls.length - 1) await new Promise(r => setTimeout(r, 3000));
+    }
+
+    await saveMusicas(musicas);
+    console.log(`🎉 ${musicas.length}/${urls.length} OK!`);
+  } catch (error) {
+    console.error('💥 ERRO:', error.message);
+    process.exit(1);
+  }
+}
+
+main();
