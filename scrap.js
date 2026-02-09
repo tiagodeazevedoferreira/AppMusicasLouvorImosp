@@ -1,3 +1,21 @@
+// === DEBUG SECRET ===
+console.log('🔍 DEBUGGING SECRET...');
+console.log('Secret exists:', !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+console.log('Secret length:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.length);
+
+try {
+  const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  console.log('✅ SUCCESS:', creds.project_id, creds.client_email);
+} catch (e) {
+  console.error('❌ JSON ERROR:', e.message);
+  console.error('Primeiros 200 chars:', process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.substring(0, 200));
+  process.exit(1);
+}
+console.log('🔍 DEBUG END\n');
+
+
+
+
 import { GoogleAuth } from 'google-auth-library';  // ✅ CORRETO
 import { google } from 'googleapis';               // ✅ CORRETO
 import { initializeApp } from 'firebase/app';
