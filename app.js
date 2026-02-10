@@ -1,7 +1,5 @@
 const SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const SHEET_TAB = 'Músicas'; // Nome exato da aba
-const API_KEY = 'AIzaSyDtroOxSNaSVLB9XzCQHuoV9z3VisXx7v0'; // NOVA CHAVE VÁLIDA ✓
-
+const SHEET_TAB = 'Músicas';
 let musicas = [];
 let dadosFirebaseMap = new Map();
 
@@ -12,41 +10,36 @@ function normalizarNome(nome, artista) {
 }
 
 async function carregarDados() {
-    console.log('🚀 Iniciando com NOVA API KEY...');
+    console.log('🚀 Carregando CSV PÚBLICO (SEM API KEY!)');
     const container = document.getElementById('resultados');
-    container.innerHTML = `
-        <div class="col-12 text-center py-5">
-            <div class="spinner-border text-primary"></div>
-            <p>Carregando...</p>
-        </div>
-    `;
+    container.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div><p>Carregando...</p></div>`;
 
     try {
-        // PLANILHA com NOVA CHAVE
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_TAB)}!A:E?key=${API_KEY}`;
-        console.log('📊 URL Planilha:', url);
+        // CSV PÚBLICO GOOGLE SHEETS - SEM API KEY! [web:30]
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_TAB)}`;
+        console.log('📊 CSV URL:', csvUrl);
         
-        const res = await fetch(url);
-        console.log('✅ Status Sheets:', res.status); // DEBUG
+        const res = await fetch(csvUrl);
+        console.log('✅ Status CSV:', res.status);
         
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.error('❌ Erro Sheets:', errorText);
-            throw new Error(`Planilha: ${res.status} - ${errorText}`);
-        }
+        if (!res.ok) throw new Error(`CSV falhou: ${res.status}`);
         
-        const data = await res.json();
-        musicas = data.values?.slice(1).map(row => ({
-            nome: row[0]?.trim(),
-            tom: row[1]?.trim(),
-            artista: row[2]?.trim(),
-            link: row[3]?.trim(),
-            data: row[4]?.trim()
-        })).filter(m => m.nome);
+        const csvText = await res.text();
+        const linhas = csvText.split('\n').filter(l => l.trim());
+        musicas = linhas.slice(1).map(linha => {
+            const cols = linha.split(',').map(c => c.trim().replace(/"/g, ''));
+            return {
+                nome: cols[0],
+                tom: cols[1],
+                artista: cols[2],
+                link: cols[3],
+                data: cols[4]
+            };
+        }).filter(m => m.nome);
         
-        console.log('✅ Planilha OK:', musicas.length, 'músicas carregadas');
+        console.log('✅ CSV OK:', musicas.length, 'músicas');
 
-        // FIREBASE CIFRAS + LETRAS
+        // FIREBASE (continua igual)
         if (window.firebaseDb) {
             try {
                 const { ref, get } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
@@ -61,26 +54,31 @@ async function carregarDados() {
                             url_cifra: dados[chave].url_cifra || ''
                         });
                     });
-                    console.log('✅ Firebase OK:', dadosFirebaseMap.size, 'músicas com cifras/letras');
+                    console.log('✅ Firebase:', dadosFirebaseMap.size, 'cifras');
                 }
             } catch (e) {
-                console.warn('⚠️ Firebase off:', e);
+                console.warn('Firebase off:', e);
             }
         }
 
         preencherFiltros();
         filtrarEMostrar();
     } catch (err) {
-        console.error('💥 ERRO TOTAL:', err);
+        console.error('💥 ERRO:', err);
         container.innerHTML = `
             <div class="col-12 text-center py-5">
                 <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
                 <p><strong>${err.message}</strong></p>
-                <p class="text-muted">Verifique Console (F12) e rode scraper.py primeiro!</p>
+                <p class="text-muted">
+                    1️⃣ Planilha → Arquivo → Compartilhar → "Qualquer pessoa com link"<br>
+                    2️⃣ F12 deve mostrar "✅ Status CSV: 200"
+                </p>
             </div>
         `;
     }
 }
+
+// ... (resto das funções iguais: preencherFiltros, filtrarEMostrar, mostrarResultados, limparFiltros)
 
 function preencherFiltros() {
     const artistas = [...new Set(musicas.map(m => m.artista))].sort();
@@ -95,12 +93,8 @@ function preencherFiltros() {
 
 function preencherSelect(id, lista) {
     const select = document.getElementById(id);
-    while (select.options.length > 1) {
-        select.remove(1);
-    }
-    lista.forEach(valor => {
-        select.add(new Option(valor, valor));
-    });
+    while (select.options.length > 1) select.remove(1);
+    lista.forEach(valor => select.add(new Option(valor, valor)));
 }
 
 function filtrarEMostrar() {
@@ -165,7 +159,6 @@ function mostrarResultados(lista) {
                                     title="${m.nome}" allowfullscreen loading="lazy"></iframe>
                         ` : ''}
                         
-                        <!-- TABS CIFRAS + LETRAS -->
                         <ul class="nav nav-tabs nav-tabs-custom mb-3">
                             <li class="nav-item">
                                 <button class="nav-link active" id="cifra-tab-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" 
@@ -202,11 +195,6 @@ window.limparFiltros = () => {
     filtrarEMostrar();
 };
 
-// Init
 document.addEventListener('DOMContentLoaded', carregarDados);
-['filtroNome', 'filtroLetra'].forEach(id => 
-    document.getElementById(id)?.addEventListener('input', filtrarEMostrar)
-);
-['filtroMusica', 'filtroArtista', 'filtroData'].forEach(id => 
-    document.getElementById(id)?.addEventListener('change', filtrarEMostrar)
-);
+['filtroNome', 'filtroLetra'].forEach(id => document.getElementById(id)?.addEventListener('input', filtrarEMostrar));
+['filtroMusica', 'filtroArtista', 'filtroData'].forEach(id => document.getElementById(id)?.addEventListener('change', filtrarEMostrar));
