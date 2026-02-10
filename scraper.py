@@ -28,40 +28,48 @@ def scrape_lyrics(url):
         return "Letra não encontrada"
 
 def main():
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds_dict = json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-    
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
-    records = sheet.get_all_records()
-    print(f"📊 Encontradas {len(records)} linhas")
-    
-    cred = credentials.Certificate(creds_dict)
-    firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
-    ref = db.reference('musicas')
-    
-    for row in records:
-        musica = row.get('Música', '').strip()
-        if not musica: break
+    try:
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds_dict = json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         
-        artista = row.get('Artista', '').strip()
-        link = row.get('Cifra', '').strip()
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
+        records = sheet.get_all_records()
+        print(f"📊 Encontradas {len(records)} linhas")
         
-        key = normalize_key(musica, artista)
-        letra = scrape_lyrics(link) if link else "Letra não encontrada"
+        cred = credentials.Certificate(creds_dict)
+        firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+        ref = db.reference('musicas')
         
-        data = {
-            'letra': letra,
-            'artista': artista,
-            'url_cifra': link or '',
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }
+        for row in records:
+            musica = row.get('Música', '').strip()
+            if not musica: 
+                print("📄 Fim dos dados")
+                break
+            
+            artista = row.get('Artista', '').strip()
+            link = row.get('Cifra', '').strip()
+            
+            print(f"🔄 Processando: {musica} - {artista}")
+            key = normalize_key(musica, artista)
+            letra = scrape_lyrics(link) if link else "Letra não encontrada"
+            
+            data = {
+                'letra': letra,
+                'artista': artista,
+                'url_cifra': link or '',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+            
+            ref.child(key).set(data)
+            print(f"✅ {musica} - {artista} ({len(letra)} chars)")
         
-        ref.child(key).set(data)
-        print(f"✅ {musica} - {artista}")
-    
-    print("🎉 17 músicas salvas!")
+        print("🎉 TODAS AS 17 MÚSICAS SALVAS!")
+        
+    except Exception as e:
+        print(f"❌ Erro: {e}")
+        raise
 
 if __name__ == '__main__':
     main()
