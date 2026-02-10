@@ -41,16 +41,14 @@ def scrape_cifra_club(url):
         
         cifra_completa = ''
         if cifra_div and len(cifra_div.get_text(strip=True)) > 50:
-            # Detecta acordes para confirmar que é cifra
             texto_teste = cifra_div.get_text()[:500]
-            if re.search(r'\b[A-G][#b]?[m7]?\b', texto_teste):
+            if re.search(r'\b[A-G][#b]?[m7]?\b', texto_teste):  # Detecta acordes
                 cifra_completa = cifra_div.get_text(separator='\n', strip=True)[:10000]
         
         # LETRA PURA (sem acordes)
         letra_pura = ''
         all_text = soup.get_text(separator='\n')
         
-        # Remove acordes comuns
         acordes_regex = r'\b[A-G][#b]?(m7?|sus|add|\d)?\b'
         letra_pura = re.sub(acordes_regex, '', all_text)
         letra_pura = re.sub(r'Intro|Refrão|Pré-refrão', '', letra_pura, flags=re.IGNORECASE)
@@ -61,7 +59,7 @@ def scrape_cifra_club(url):
         else:
             letra_pura = 'Letra não encontrada'
         
-        return cifra_completa or letra_pura, letra_pura  # Prioriza cifra se encontrada
+        return cifra_completa or letra_pura, letra_pura
         
     except Exception as e:
         print(f"Erro scraping {url}: {str(e)[:100]}")
@@ -69,26 +67,42 @@ def scrape_cifra_club(url):
 
 def main():
     try:
+        # SUPORTE DUPLA: arquivo local OU variável de ambiente
+        creds_dict = None
+        
+        # 1. Tenta variável de ambiente (GitHub Actions)
+        if 'GOOGLESERVICEACCOUNTJSON' in os.environ:
+            creds_dict = json.loads(os.environ['GOOGLESERVICEACCOUNTJSON'])
+            print("✅ Usando variável de ambiente")
+        
+        # 2. Tenta arquivo local
+        elif os.path.exists('appmusicasimosp-firebase-adminsdk-fbsvc-eeaaa21787.json'):
+            with open('appmusicasimosp-firebase-adminsdk-fbsvc-eeaaa21787.json', 'r') as f:
+                creds_dict = json.load(f)
+            print("✅ Usando arquivo local")
+        
+        else:
+            raise FileNotFoundError("❌ Arquivo JSON não encontrado E variável não definida")
+        
         # Google Sheets
         scopes = [
             'https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive'
         ]
-        creds_dict = json.loads(os.environ['GOOGLESERVICEACCOUNTJSON'])
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         
         client = gspread.authorize(creds)
         sheet = client.open_by_key(SHEET_ID).worksheet('Músicas')
         records = sheet.get_all_records()
-        print(f"{len(records)} músicas na planilha")
+        print(f"📊 {len(records)} músicas na planilha")
         
         # Firebase
-        cred = credentials.Certificate(creds_dict)
-        firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+        firebase_cred = credentials.Certificate(creds_dict)
+        firebase_admin.initialize_app(firebase_cred, {'databaseURL': DB_URL})
         ref = db.reference('musicas')
         
-        salvas = 0
-        for row in records:
+        salvas = atualizadas = 0
+        for i, row in enumerate(records, 1):
             musica = row.get('Música', '').strip()
             if not musica:
                 print("Fim dados")
@@ -97,7 +111,7 @@ def main():
             artista = row.get('Artista', '').strip()
             link = row.get('Cifra', '').strip()
             
-            print(f"{musica} - {artista}")
+            print(f"[{i}] {musica[:40]}... - {artista}")
             key = normalize_key(musica, artista)
             
             cifra_completa, letra_pura = scrape_cifra_club(link)
@@ -106,19 +120,26 @@ def main():
                 'titulo': musica,
                 'artista': artista,
                 'letra': letra_pura,
-                'cifra': cifra_completa,  # NOVA: salva cifra completa
+                'cifra': cifra_completa,  # ✅ NOVA: cifra com acordes
                 'url_cifra': link or '',
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
+            # Salva/atualiza
             ref.child(key).set(data)
-            print(f"  SALVO: Cifra({len(cifra_completa or '')} chars) + Letra({len(letra_pura)} chars)")
-            salvas += 1
+            
+            if cifra_completa:
+                print(f"  ✅ CIFRA({len(cifra_completa)} chars) + Letra({len(letra_pura)})")
+                salvas += 1
+            else:
+                print(f"  ❌ Sem dados válidos")
+            
+            atualizadas += 1
         
-        print(f"\n{salvas} MÚSICAS PROCESSADAS COM CIFRA + LETRAS!")
+        print(f"\n🎉 FINALIZADO: {salvas}/{atualizadas} músicas com CIFRA + LETRAS salvas!")
         
     except Exception as e:
-        print(f"ERRO GERAL:", e)
+        print(f"❌ ERRO:", str(e))
         raise
 
 if __name__ == "__main__":
