@@ -1,6 +1,6 @@
 const SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
 const SHEET_TAB = 'Músicas'; // Nome exato da aba
-const API_KEY = 'AIzaSyC9rb5ka5OzrtDfktGPmue4C7Xr6trOYA'; // NOVA CHAVE
+const API_KEY = 'AIzaSyDtroOxSNaSVLB9XzCQHuoV9z3VisXx7v0'; // NOVA CHAVE VÁLIDA ✓
 
 let musicas = [];
 let dadosFirebaseMap = new Map();
@@ -12,7 +12,7 @@ function normalizarNome(nome, artista) {
 }
 
 async function carregarDados() {
-    console.log('Iniciando...');
+    console.log('🚀 Iniciando com NOVA API KEY...');
     const container = document.getElementById('resultados');
     container.innerHTML = `
         <div class="col-12 text-center py-5">
@@ -22,14 +22,19 @@ async function carregarDados() {
     `;
 
     try {
-        // PLANILHA - URL corrigida com nome da aba
+        // PLANILHA com NOVA CHAVE
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_TAB)}!A:E?key=${API_KEY}`;
-        console.log('URL Planilha:', url); // Para debug
+        console.log('📊 URL Planilha:', url);
+        
         const res = await fetch(url);
+        console.log('✅ Status Sheets:', res.status); // DEBUG
+        
         if (!res.ok) {
             const errorText = await res.text();
+            console.error('❌ Erro Sheets:', errorText);
             throw new Error(`Planilha: ${res.status} - ${errorText}`);
         }
+        
         const data = await res.json();
         musicas = data.values?.slice(1).map(row => ({
             nome: row[0]?.trim(),
@@ -38,9 +43,10 @@ async function carregarDados() {
             link: row[3]?.trim(),
             data: row[4]?.trim()
         })).filter(m => m.nome);
-        console.log('Planilha OK:', musicas.length, 'músicas');
+        
+        console.log('✅ Planilha OK:', musicas.length, 'músicas carregadas');
 
-        // FIREBASE LETRAS + CIFRAS
+        // FIREBASE CIFRAS + LETRAS
         if (window.firebaseDb) {
             try {
                 const { ref, get } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js');
@@ -55,21 +61,22 @@ async function carregarDados() {
                             url_cifra: dados[chave].url_cifra || ''
                         });
                     });
-                    console.log('Firebase OK:', dadosFirebaseMap.size, 'registros');
+                    console.log('✅ Firebase OK:', dadosFirebaseMap.size, 'músicas com cifras/letras');
                 }
             } catch (e) {
-                console.warn('Firebase off:', e);
+                console.warn('⚠️ Firebase off:', e);
             }
         }
 
         preencherFiltros();
         filtrarEMostrar();
     } catch (err) {
-        console.error(err);
+        console.error('💥 ERRO TOTAL:', err);
         container.innerHTML = `
             <div class="col-12 text-center py-5">
                 <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
-                <p>Erro planilha. <strong>Rode scraper primeiro!</strong></p>
+                <p><strong>${err.message}</strong></p>
+                <p class="text-muted">Verifique Console (F12) e rode scraper.py primeiro!</p>
             </div>
         `;
     }
@@ -128,7 +135,7 @@ function mostrarResultados(lista) {
         container.innerHTML = `
             <div class="col-12 text-center py-5">
                 <i class="bi bi-music-note-beamed display-1 text-muted"></i>
-                <h4 class="mt-3 text-muted">Nenhuma música</h4>
+                <h4 class="mt-3 text-muted">Nenhuma música encontrada</h4>
             </div>
         `;
         return;
@@ -158,30 +165,26 @@ function mostrarResultados(lista) {
                                     title="${m.nome}" allowfullscreen loading="lazy"></iframe>
                         ` : ''}
                         
-                        <!-- NOVO: Tabs para Cifras e Letras AO LADO -->
-                        <ul class="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
-                            <li class="nav-item" role="presentation">
+                        <!-- TABS CIFRAS + LETRAS -->
+                        <ul class="nav nav-tabs nav-tabs-custom mb-3">
+                            <li class="nav-item">
                                 <button class="nav-link active" id="cifra-tab-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" 
-                                        data-bs-toggle="tab" data-bs-target="#cifra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" 
-                                        type="button" role="tab">
+                                        data-bs-toggle="tab" data-bs-target="#cifra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" type="button">
                                     <i class="bi bi-guitar me-1"></i>Cifras
                                 </button>
                             </li>
-                            <li class="nav-item" role="presentation">
+                            <li class="nav-item">
                                 <button class="nav-link" id="letra-tab-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" 
-                                        data-bs-toggle="tab" data-bs-target="#letra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" 
-                                        type="button" role="tab">
+                                        data-bs-toggle="tab" data-bs-target="#letra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" type="button">
                                     <i class="bi bi-file-earmark-text me-1"></i>Letra
                                 </button>
                             </li>
                         </ul>
                         
                         <div class="tab-content">
-                            <!-- TAB CIFRA com innerHTML -->
                             <div class="tab-pane fade show active" id="cifra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" role="tabpanel">
                                 <div class="cifra">${cifra}</div>
                             </div>
-                            <!-- TAB LETRA -->
                             <div class="tab-pane fade" id="letra-${m.nome.replace(/[^a-zA-Z0-9]/g,'')}" role="tabpanel">
                                 <div class="letra">${letra}</div>
                             </div>
