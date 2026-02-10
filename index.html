@@ -1,133 +1,164 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Catálogo de Músicas - IMOSP</title>
-  
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="manifest.json">
-  
-  <!-- Ícones locais -->
-  <link rel="icon" type="image/jpeg" sizes="192x192" href="icon-192.jpg">
-  <link rel="icon" type="image/jpeg" sizes="512x512" href="icon-512.jpg">
-  
-  <style>
-    body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; }
-    .app-card { background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
-    .musica-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; margin-bottom: 15px; }
-    .letra { background: rgba(255,255,255,0.95); color: #333; padding: 20px; border-radius: 10px; font-family: 'Georgia', serif; line-height: 1.8; white-space: pre-wrap; }
-    .filtros { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-radius: 15px; padding: 20px; }
-    #resultados { min-height: 400px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Músicas - IMOSP</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Ícones locais -->
+    <link rel="icon" type="image/jpeg" sizes="192x192" href="icon-192.jpg">
+    <link rel="icon" type="image/jpeg" sizes="512x512" href="icon-512.jpg">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        .app-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .musica-card {
+            background: linear-gradient(135deg, #667eea 0%, 764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        .letra {
+            background: rgba(255,255,255,0.95);
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: Georgia, serif;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+        .cifra {
+            background: rgba(255,255,255,0.95);
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .filtros {
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        #resultados {
+            min-height: 400px;
+        }
+        .nav-tabs .nav-link {
+            color: white;
+            border: none;
+            background: rgba(255,255,255,0.2);
+        }
+        .nav-tabs .nav-link.active {
+            background: rgba(255,255,255,0.4);
+            color: #333;
+        }
+    </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
-  
-  <!-- Header com LOGO GARANTIDO -->
-  <header class="bg-primary text-white text-center py-4 app-card mx-3 mt-3">
-    <img src="Imosp.jpg" alt="IMOSP" class="img-fluid mb-2" 
-         style="height: 60px; width: auto; border-radius: 10px; max-width: 200px;" 
-         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-    <div style="display:none;">
-      <i class="bi bi-building-church display-4 mb-2"></i>
-    </div>
-    <h1 class="mb-1 fw-bold">Catálogo de Músicas</h1>
-    <p class="mb-0">Louvor e Adoração IMOSP</p>
-  </header>
+    <!-- Header com LOGO GARANTIDO -->
+    <header class="bg-primary text-white text-center py-4 app-card mx-3 mt-3">
+        <img src="Imosp.jpg" alt="IMOSP" class="img-fluid mb-2" style="height: 60px; width: auto; border-radius: 10px; max-width: 200px;" 
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div style="display:none;">
+            <i class="bi bi-building-church display-4 mb-2"></i>
+        </div>
+        <h1 class="mb-1 fw-bold">Catálogo de Músicas</h1>
+        <p class="mb-0">Louvor e Adoração IMOSP</p>
+    </header>
 
-  <!-- Filtros SIMPLIFICADOS -->
-  <main class="container-fluid my-4 px-3 flex-grow-1">
-    <div class="row justify-content-center">
-      <div class="col-12 col-lg-10">
-        <div class="filtros shadow-lg p-4 mb-4">
-          <div class="row g-3">
-            <div class="col-md-6 col-lg-3">
-              <label class="form-label fw-bold">Buscar no Nome</label>
-              <input type="text" class="form-control" id="filtroNome" placeholder="Digite parte do nome...">
+    <!-- Filtros SIMPLIFICADOS -->
+    <main class="container-fluid my-4 px-3 flex-grow-1">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-10">
+                <div class="filtros shadow-lg p-4 mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label fw-bold">Buscar no Nome</label>
+                            <input type="text" class="form-control" id="filtroNome" placeholder="Digite parte do nome...">
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label fw-bold">Música</label>
+                            <select class="form-select" id="filtroMusica">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
+                            <label class="form-label fw-bold">Artista</label>
+                            <select class="form-select" id="filtroArtista">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
+                            <label class="form-label fw-bold">Data</label>
+                            <select class="form-select" id="filtroData">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Buscar na Letra</label>
+                            <input type="text" class="form-control" id="filtroLetra" placeholder="Trecho da letra...">
+                        </div>
+                        <!-- SOMENTE BOTÃO LIMPAR -->
+                        <div class="col-12">
+                            <div class="d-flex justify-content-end">
+                                <button class="btn btn-outline-secondary px-4 py-2" onclick="limparFiltros()">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Limpar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
-            <div class="col-md-6 col-lg-3">
-              <label class="form-label fw-bold">Música</label>
-              <select class="form-select" id="filtroMusica">
-                <option value="">Todas</option>
-              </select>
-            </div>
-            
-            <div class="col-md-6 col-lg-2">
-              <label class="form-label fw-bold">Artista</label>
-              <select class="form-select" id="filtroArtista">
-                <option value="">Todos</option>
-              </select>
-            </div>
-            
-            <div class="col-md-6 col-lg-2">
-              <label class="form-label fw-bold">Data</label>
-              <select class="form-select" id="filtroData">
-                <option value="">Todas</option>
-              </select>
-            </div>
-            
-            <div class="col-12">
-              <label class="form-label fw-bold">Buscar na Letra</label>
-              <input type="text" class="form-control" id="filtroLetra" placeholder="Trecho da letra...">
-            </div>
-            
-            <!-- SOMENTE BOTÃO LIMPAR -->
-            <div class="col-12">
-              <div class="d-flex justify-content-end">
-                <button class="btn btn-outline-secondary px-4 py-2" onclick="limparFiltros()">
-                  <i class="bi bi-arrow-clockwise me-1"></i>Limpar
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Resultados -->
         <div id="resultados" class="row g-3">
-          <div class="col-12 text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Carregando...</span>
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="mt-3">Carregando músicas da planilha e Firebase...</p>
             </div>
-            <p class="mt-3">Carregando músicas da planilha e Firebase...</p>
-          </div>
         </div>
-      </div>
-    </div>
-  </main>
+    </main>
 
-  <!-- Footer -->
-  <footer class="bg-dark text-white text-center py-3 mt-auto">
-    <p class="mb-0">&copy; 2026 IMOSP - AppMusicasLouvor</p>
-  </footer>
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3 mt-auto">
+        <p class="mb-0">&copy; 2026 IMOSP - AppMusicasLouvor</p>
+    </footer>
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getDatabase } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getDatabase } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprjA",
+            authDomain: "appmusicasimosp.firebaseapp.com",
+            databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com/",
+            projectId: "appmusicasimosp",
+            storageBucket: "appmusicasimosp.appspot.com"
+        };
+        const app = initializeApp(firebaseConfig);
+        window.firebaseDb = getDatabase(app);
+        window.firebaseReady = true;
+        console.log('Firebase inicializado!');
+    </script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprj_A",
-      authDomain: "appmusicasimosp.firebaseapp.com",
-      databaseURL: "https://appmusicasimosp-default-rtdb.firebaseio.com",
-      projectId: "appmusicasimosp",
-      storageBucket: "appmusicasimosp.appspot.com"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    window.firebaseDb = getDatabase(app);
-    window.firebaseReady = true;
-    console.log('Firebase inicializado!');
-  </script>
-
-  <!-- App Logic -->
-  <script type="module" src="app.js"></script>
-  
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- App Logic -->
+    <script type="module" src="app.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
