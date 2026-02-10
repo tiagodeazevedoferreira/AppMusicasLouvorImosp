@@ -10,67 +10,77 @@ from datetime import datetime, timezone
 import json
 import os
 
-SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc'
-DB_URL = 'https://appmusicasimosp-default-rtdb.firebaseio.com/'
+SHEET_ID = "1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc"
+DB_URL = "https://appmusicasimosp-default-rtdb.firebaseio.com/"
 
 def normalize_key(musica, artista):
     """Chave única: musica---artista normalizada"""
-    key = f"{unidecode(musica).lower().strip().replace(' ', '-').replace('/', '-') }---{unidecode(artista).lower().strip().replace(' ', '-').replace('/', '-')}"
-    return re.sub(r'[^a-z0-9\-]', '-', key)
+    key = (unidecode(musica).lower().strip().replace(' ', '-').replace(',', '-') + '---' +
+           unidecode(artista).lower().strip().replace(' ', '-').replace(',', '-'))
+    return re.sub(r'[^a-z0-9-]', '-', key)
 
-def scrape_lyrics(url):
-    """Extrai letra CifraClub com múltiplos fallbacks"""
+def scrape_cifra_club(url):
+    """Extrai CIFRA COMPLETA (com acordes) + LETRA PURA (sem acordes)"""
+    if not url:
+        return None, None
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
         resp = requests.get(url, timeout=15, headers=headers)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'lxml')
         
-        # Selector principal CifraClub
-        letra_div = (soup.find('div', class_='cnt-letra') or 
+        # CIFRA COMPLETA (com acordes) - selectors CifraClub
+        cifra_div = (soup.find('div', class_='cnt-letra') or 
                      soup.find('div', {'data-testid': 'lyrics-container'}) or
-                     soup.find('div', class_=re.compile(r'lyric|song|letra|lyrics')) or
-                     soup.find('pre'))
+                     soup.find('pre') or
+                     soup.find('div', class_=re.compile('lyrics|song|letra|cifra')))
         
-        if letra_div and len(letra_div.get_text(strip=True)) > 50:
-            texto = letra_div.get_text(separator='\n', strip=True)
-            return texto[:10000]  # Limita tamanho
+        cifra_completa = ''
+        if cifra_div and len(cifra_div.get_text(strip=True)) > 50:
+            # Detecta acordes para confirmar que é cifra
+            texto_teste = cifra_div.get_text()[:500]
+            if re.search(r'\b[A-G][#b]?[m7]?\b', texto_teste):
+                cifra_completa = cifra_div.get_text(separator='\n', strip=True)[:10000]
         
-        # Fallback: extrai seções com [Parte] + texto
-        sections = soup.find_all(['div', 'p', 'span'], string=re.compile(r'^\[.*parte.*\]', re.I))
-        if sections:
-            letra_parts = []
-            for sec in sections:
-                sibling = sec.find_next_sibling()
-                if sibling:
-                    letra_parts.append(sibling.get_text(separator='\n', strip=True))
-            if letra_parts:
-                return '\n'.join(letra_parts)[:10000]
+        # LETRA PURA (sem acordes)
+        letra_pura = ''
+        all_text = soup.get_text(separator='\n')
         
-        # Último fallback: texto principal da página (linhas longas)
-        content = soup.get_text(separator='\n')
-        lines = [line.strip() for line in content.split('\n') 
-                if len(line.strip()) > 15 and not re.match(r'^[A-G][a-z#b]?\s', line.strip())]
-        letra = '\n'.join(lines[:40])
+        # Remove acordes comuns
+        acordes_regex = r'\b[A-G][#b]?(m7?|sus|add|\d)?\b'
+        letra_pura = re.sub(acordes_regex, '', all_text)
+        letra_pura = re.sub(r'Intro|Refrão|Pré-refrão', '', letra_pura, flags=re.IGNORECASE)
+        letra_pura = re.sub(r'\n{3,}', '\n\n', letra_pura).strip()
         
-        return letra if len(letra) > 200 else f"Letra não encontrada em {url}"
+        if len(letra_pura) > 200:
+            letra_pura = letra_pura[:10000]
+        else:
+            letra_pura = 'Letra não encontrada'
+        
+        return cifra_completa or letra_pura, letra_pura  # Prioriza cifra se encontrada
         
     except Exception as e:
-        return f"Erro scraping {url}: {str(e)[:100]}"
+        print(f"Erro scraping {url}: {str(e)[:100]}")
+        return None, None
 
 def main():
     try:
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds_dict = json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        # Google Sheets
+        scopes = [
+            'https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive'
+        ]
+        creds_dict = json.loads(os.environ['GOOGLESERVICEACCOUNTJSON'])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         
-        # Sheets
         client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
+        sheet = client.open_by_key(SHEET_ID).worksheet('Músicas')
         records = sheet.get_all_records()
-        print(f"📊 {len(records)} músicas na planilha")
+        print(f"{len(records)} músicas na planilha")
         
         # Firebase
         cred = credentials.Certificate(creds_dict)
@@ -80,33 +90,36 @@ def main():
         salvas = 0
         for row in records:
             musica = row.get('Música', '').strip()
-            if not musica: 
-                print("📄 Fim dados")
+            if not musica:
+                print("Fim dados")
                 break
-            
+                
             artista = row.get('Artista', '').strip()
             link = row.get('Cifra', '').strip()
             
-            print(f"🔄 {musica} - {artista}")
+            print(f"{musica} - {artista}")
             key = normalize_key(musica, artista)
-            letra = scrape_lyrics(link) if link else "Sem link CifraClub"
+            
+            cifra_completa, letra_pura = scrape_cifra_club(link)
             
             data = {
-                'letra': letra,
+                'titulo': musica,
                 'artista': artista,
+                'letra': letra_pura,
+                'cifra': cifra_completa,  # NOVA: salva cifra completa
                 'url_cifra': link or '',
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
             ref.child(key).set(data)
-            print(f"✅ SALVO | Letra: {len(letra)} chars")
+            print(f"  SALVO: Cifra({len(cifra_completa or '')} chars) + Letra({len(letra_pura)} chars)")
             salvas += 1
         
-        print(f"\n🎉 {salvas}/17 MÚSICAS PROCESSADAS COM LETRAS!")
+        print(f"\n{salvas} MÚSICAS PROCESSADAS COM CIFRA + LETRAS!")
         
     except Exception as e:
-        print(f"❌ ERRO GERAL: {e}")
+        print(f"ERRO GERAL:", e)
         raise
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
