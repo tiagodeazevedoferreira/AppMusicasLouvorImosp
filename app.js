@@ -1,26 +1,24 @@
 const SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc';
-const GID_MUSICAS = '0'; // gid=0 da aba Músicas
+const SHEET_GID = '0'; // gid=0 (aba Músicas)
 const API_KEY = 'AIzaSyDcj5ebPcBXw5Ev6SQHXzxToCGfINprjA';
 
 let musicas = [];
 let dadosFirebaseMap = new Map();
 
-function normalizarNome(nome) {
-  return nome?.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') || '';
+function normalizarNome(nome, artista = '') {
+  const nomeNorm = nome?.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') || '';
+  const artistaNorm = artista?.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-') || '';
+  return `${nomeNorm}---${artistaNorm}`;
 }
 
 async function carregarDados() {
-  console.log('🚀 Carregando planilha + Firebase...');
-  document.getElementById('resultados').innerHTML = `
-    <div class="col-12 text-center py-5">
-      <div class="spinner-border text-primary" role="status"></div>
-      <p class="mt-3">📊 Planilha + 🔥 Letras...</p>
-    </div>`;
+  console.log('🚀 Iniciando...');
+  const container = document.getElementById('resultados');
+  container.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div><p>📊 Carregando...</p></div>`;
 
   try {
-    // 1. PLANILHA (Nome A, Tom B, Artista C, Link D, Data E)
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Músicas!A1:E?key=${API_KEY}`;
+    // PLANILHA: range A1:E1000, gid=0
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A:E?key=${API_KEY}&gid=${SHEET_GID}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Planilha ${res.status}`);
     
@@ -33,39 +31,39 @@ async function carregarDados() {
       data: row[4]?.trim() || ''
     })).filter(m => m.nome);
     
-    console.log('📊 Planilha:', musicas.length, 'músicas');
+    console.log('📊 Planilha OK:', musicas.length);
 
-    // 2. FIREBASE LETRAS
+    // FIREBASE LETRAS (opcional)
     if (window.firebaseDb) {
       try {
         const dbRef = ref(window.firebaseDb, 'musicas');
         const snapshot = await get(dbRef);
         if (snapshot.exists()) {
           const dados = snapshot.val();
-          Object.keys(dados).forEach(chave => {
-            dadosFirebaseMap.set(chave, {
-              letra: dados[chave].letra || 'Letra não encontrada',
-              url_cifra: dados[chave].url_cifra || ''
-            });
-          });
+          Object.keys(dados).forEach(chave => dadosFirebaseMap.set(chave, {
+            letra: dados[chave].letra || 'Letra não encontrada',
+            url_cifra: dados[chave].url_cifra || ''
+          }));
           console.log('🔥 Firebase:', dadosFirebaseMap.size, 'letras');
         }
       } catch (e) {
-        console.warn('Firebase indisponível:', e);
+        console.warn('Firebase off:', e);
       }
     }
     
     preencherFiltros();
     filtrarEMostrar();
   } catch (err) {
-    console.error('❌ Erro:', err);
-    document.getElementById('resultados').innerHTML = `
-      <div class="col-12 text-center py-5">
-        <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
-        <p>${err.message}</p>
-      </div>`;
+    console.error(err);
+    container.innerHTML = `<div class="col-12 text-center py-5">
+      <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+      <p>Erro planilha. <strong>Rode scraper primeiro!</strong></p></div>`;
   }
 }
+
+// RESTO IGUAL (preencherFiltros, filtrarEMostrar, mostrarResultados, limparFiltros)...
+// [Cole o resto do código anterior aqui - funções iguais]
+
 
 function preencherFiltros() {
   const artistas = [...new Set(musicas.map(m => m.artista))].sort();
