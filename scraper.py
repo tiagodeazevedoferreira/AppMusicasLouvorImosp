@@ -12,7 +12,6 @@ import os
 
 # Configurações
 SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc'
-SHEET_NAME = 'Sheet1'  # Ajuste se necessário
 DB_URL = 'https://appmusicasimosp-default-rtdb.firebaseio.com/'
 
 def normalize_key(musica, artista):
@@ -39,19 +38,27 @@ def main():
     creds_dict = json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+    
+    sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
+    
+    # Ler dados: colunas A=Música, C=Artista, F=Cifra até A vazia
+    records = sheet.get_all_records()
+    
+    print(f"Encontradas {len(records)} linhas na planilha")
     
     # Firebase
     cred = credentials.Certificate(creds_dict)
     firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
     ref = db.reference('musicas')
     
-    # Ler dados: colunas A, C, F até A vazia
-    records = sheet.get_all_records()  # Assume cabeçalho
+    processadas = 0
+    puladas = 0
+    
     for row in records:
         musica = row.get('Música', '').strip()
         if not musica:  # Para quando A vazia
             break
+            
         artista = row.get('Artista', '').strip()
         link = row.get('Cifra', '').strip()
         
@@ -60,6 +67,7 @@ def main():
         # Pula se já existe
         if ref.child(key).get():
             print(f"Pulando {musica} - {artista} (já existe)")
+            puladas += 1
             continue
         
         # Busca letra
@@ -72,11 +80,14 @@ def main():
         data = {
             'letra': letra,
             'artista': artista,
-            'url_cifra': link,
+            'url_cifra': link or '',
             'timestamp': datetime.utcnow().isoformat()
         }
         ref.child(key).set(data)
-        print(f"Salvo: {musica} - {artista}")
+        print(f"✅ Salvo: {musica} - {artista} | Letra: {len(letra)} chars")
+        processadas += 1
+    
+    print(f"\n🎉 FINALIZADO: {processadas} processadas, {puladas} puladas")
 
 if __name__ == '__main__':
     main()
