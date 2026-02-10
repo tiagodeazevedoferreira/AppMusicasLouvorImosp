@@ -1,44 +1,25 @@
-name: Scraper Cifra Club (22h diário)
+name: Scrape Músicas
 
 on:
   schedule:
-    - cron: '0 1 * * *' # 22h SP = 01h UTC
-  workflow_dispatch:
+    - cron: '0 22 * * *'  # Diariamente 22h UTC (~19h -03)
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Instalar dependências
-        run: npm install
-
-      - name: Configurar Google Credentials
-        run: |
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' | jq . > credentials.json
-        # ↑ CORRIGIDO: | jq . remove aspas/quebra YAML, garante JSON válido
-
-      - name: Verificar credentials.json (Debug)
-        run: |
-          echo "Tamanho do credentials.json: $(wc -c < credentials.json) bytes"
-          head -n 5 credentials.json
-          echo "..." 
-
-      - name: Executar scraper
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ./credentials.json
-          GOOGLESERVICEACCOUNTJSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          FIREBASE_PROJECT_ID: appmusicasimosp
-          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}  # ← Adicione este secret!
-          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-        run: node scrap.js
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    
+    - name: Run scraper
+      env:
+        GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      run: python scraper.py
