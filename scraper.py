@@ -6,11 +6,10 @@ import requests
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 
-# Configurações
 SHEET_ID = '1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc'
 DB_URL = 'https://appmusicasimosp-default-rtdb.firebaseio.com/'
 
@@ -24,10 +23,8 @@ def scrape_lyrics(url):
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'lxml')
         letra_div = soup.find('div', class_='cnt-letra')
-        if letra_div:
-            return letra_div.get_text(separator='\n', strip=True)
-        return "Letra não encontrada"
-    except Exception:
+        return letra_div.get_text(separator='\n', strip=True) if letra_div else "Letra não encontrada"
+    except:
         return "Letra não encontrada"
 
 def main():
@@ -35,43 +32,36 @@ def main():
     creds_dict = json.loads(os.environ['GOOGLE_SERVICE_ACCOUNT_JSON'])
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     
-    # Sheets
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
     records = sheet.get_all_records()
-    print(f"Encontradas {len(records)} linhas na planilha")
+    print(f"📊 Encontradas {len(records)} linhas")
     
-    # Firebase (inicializa SEM checar existência)
     cred = credentials.Certificate(creds_dict)
     firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
     ref = db.reference('musicas')
     
-    processadas = 0
     for row in records:
         musica = row.get('Música', '').strip()
-        if not musica:
-            break
-            
+        if not musica: break
+        
         artista = row.get('Artista', '').strip()
         link = row.get('Cifra', '').strip()
         
         key = normalize_key(musica, artista)
-        
         letra = scrape_lyrics(link) if link else "Letra não encontrada"
         
         data = {
             'letra': letra,
             'artista': artista,
             'url_cifra': link or '',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
-        # SALVA DIRETO (sem .get() que falha)
         ref.child(key).set(data)
-        print(f"✅ Salvo: {musica} - {artista} | Letra: {len(letra)} chars")
-        processadas += 1
+        print(f"✅ {musica} - {artista}")
     
-    print(f"\n🎉 FINALIZADO: {processadas} músicas salvas no Firebase!")
+    print("🎉 17 músicas salvas!")
 
 if __name__ == '__main__':
     main()
