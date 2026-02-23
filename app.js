@@ -1,5 +1,5 @@
 const SHEETID = "1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc";
-const SHEETTAB = "Músicas";  // Nome exato da aba (corrigido do gid)
+const SHEETTAB = "Musicas";  // Nome exato da aba (corrigido do gid)
 const APIKEY = "AIzaSyC9rb5ka5OzrtDfktGPmue4C7Xr6trO_YA";  // NOVA CHAVE
 
 let musicas = [];
@@ -182,3 +182,4 @@ window.limparFiltros = () => {
 document.addEventListener('DOMContentLoaded', carregarDados);
 ['filtroNome', 'filtroLetra'].forEach(id => document.getElementById(id)?.addEventListener('input', filtrarEMostrar));
 ['filtroMusica', 'filtroArtista', 'filtroData'].forEach(id => document.getElementById(id)?.addEventListener('change', filtrarEMostrar));
+
