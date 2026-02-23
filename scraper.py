@@ -68,7 +68,7 @@ def main():
         
         # Sheets
         client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
+        sheet = client.open_by_key(SHEET_ID).worksheet("Musicas")
         records = sheet.get_all_records()
         print(f"📊 {len(records)} músicas na planilha")
         
@@ -110,3 +110,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
