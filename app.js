@@ -160,7 +160,7 @@ function filtrarEMostrar() {
 
     const videoId = m.link?.match(/(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
 
-    return 
+    return `
       <div class="col-12">
         <div class="musica-card p-3">
           <h5 class="mb-1">${m.nome}</h5>
@@ -187,7 +187,7 @@ function filtrarEMostrar() {
           </details>
         </div>
       </div>
-    ;
+    `;
   }).join('');
 }
 
