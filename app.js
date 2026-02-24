@@ -156,15 +156,18 @@ function mostrarResultados(lista) {
             ${videoId ? `
               <iframe class="w-100 rounded mb-3" height="180" src="https://www.youtube.com/embed/${videoId}" title="${m.nome}" allowfullscreen loading="lazy"></iframe>
             ` : ''}
-			<!-- NOVO: Botão e visualização da CIFRA (imagem) -->
 			<details class="mb-3">
 			  <summary class="btn btn-light btn-sm w-100 mb-2 fw-bold"><i class="bi bi-file-earmark-music me-1"></i>Cifra</summary>
 			  <div class="cifra bg-light p-3 rounded small text-center" style="font-family:monospace; overflow-y: hidden; max-height: none;">
 				${urlImagemCifra 
-				  ? `<img src="${urlImagemCifra}" alt="Cifra da música ${m.nome}" class="img-fluid rounded shadow-sm" loading="lazy" style="max-width:100%; height:auto; display:block; margin:0 auto;">`
-				  : `<p class="text-muted my-3">Cifra (imagem) não disponível</p>`
+				  ? `
+					<img src="${urlImagemCifra}" alt="Cifra da música ${m.nome}" class="img-fluid rounded shadow-sm" loading="lazy" style="max-width:100%; height:auto; display:block; margin:0 auto;">
+				  `
+				  : `
+					<p class="text-muted my-3">Cifra (imagem) não disponível</p>
+					${cifraTexto ? `<pre class="mt-3 text-start small" style="white-space: pre-wrap; background:#f8f9fa; padding:10px; border-radius:6px;">${cifraTexto}</pre>` : ''}
+				  `
 				}
-				${cifraTexto ? `<pre class="mt-3 text-start small" style="white-space: pre-wrap;">${cifraTexto}</pre>` : ''}
 			  </div>
 			</details>
             <details>
