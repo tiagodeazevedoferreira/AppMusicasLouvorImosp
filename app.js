@@ -53,125 +53,98 @@ async function carregarDados() {
         if (snapshot.exists()) {
           const dados = snapshot.val();
           Object.keys(dados).forEach(chave => {
-            dadosFirebaseMap.set(chave, {
-              letra: dados[chave].letra || 'Letra não encontrada',
-              urlcifra: dados[chave].urlcifra || '',
-              cifra: dados[chave].cifra || '',  // Campo opcional de cifra texto
-              url_imagem_cifra: dados[chave].url_imagem_cifra || ''  // Novo campo de imagem
-            });
+            dadosFirebaseMap.set(chave, dados[chave]);
           });
-          console.log('Firebase OK,', dadosFirebaseMap.size, 'letras');
+          console.log('Firebase OK,', dadosFirebaseMap.size, 'entradas');
         }
-      } catch (e) {
-        console.warn('Firebase off:', e);
+      } catch (err) {
+        console.log('Firebase erro:', err.message);
       }
     }
 
-    preencherFiltros();
     filtrarEMostrar();
   } catch (err) {
-    console.error(err);
-    container.innerHTML = `
-      <div class="col-12 text-center py-5">
-        <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
-        <p>Erro planilha. <strong>Rode scraper primeiro!</strong></p>
-      </div>
-    `;
+    container.innerHTML = `<div class="alert alert-danger text-center">Erro: ${err.message}</div>`;
   }
-}
-
-function preencherSelect(id, options) {
-  const select = document.getElementById(id);
-  select.innerHTML = '<option value="">Todos/Todas</option>' + options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
-}
-
-function preencherFiltros() {
-  const artistas = [...new Set(musicas.map(m => m.artista))].sort();
-  preencherSelect('filtroArtista', artistas);
-
-  const datas = [...new Set(musicas.map(m => m.data).filter(Boolean))].sort((a, b) => b.localeCompare(a, 'pt-BR'));
-  preencherSelect('filtroData', datas);
-
-  const nomesMusicas = [...new Set(musicas.map(m => m.nome))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  preencherSelect('filtroMusica', nomesMusicas);
 }
 
 function filtrarEMostrar() {
-  const filtros = {
-    nome: document.getElementById('filtroNome')?.value.trim().toLowerCase() || '',
-    musica: document.getElementById('filtroMusica')?.value.trim() || '',
-    artista: document.getElementById('filtroArtista')?.value.trim() || '',
-    data: document.getElementById('filtroData')?.value.trim() || '',
-    letra: document.getElementById('filtroLetra')?.value.trim().toLowerCase() || ''
-  };
+  const filtroNome = document.getElementById('filtroNome')?.value.toLowerCase() || '';
+  const filtroLetra = document.getElementById('filtroLetra')?.value.toLowerCase() || '';
+  const filtroMusica = document.getElementById('filtroMusica')?.value || '';
+  const filtroArtista = document.getElementById('filtroArtista')?.value || '';
+  const filtroData = document.getElementById('filtroData')?.value || '';
 
-  const filtrados = musicas.filter(m => {
-    if (filtros.nome && !m.nome.toLowerCase().includes(filtros.nome)) return false;
-    if (filtros.musica && m.nome !== filtros.musica) return false;
-    if (filtros.artista && m.artista !== filtros.artista) return false;
-    if (filtros.data && m.data !== filtros.data) return false;
-    if (filtros.letra) {
-      const dadosFb = dadosFirebaseMap.get(normalizarNome(m.nome, m.artista)) || dadosFirebaseMap.get(normalizarNome(m.nome, ''));
-      return (dadosFb?.letra?.toLowerCase().includes(filtros.letra) ||
-              normalizarNome(m.nome, '').includes(filtros.letra));
+  let filtradas = musicas.filter(m => {
+    const nomeLower = m.nome.toLowerCase();
+    const artistaLower = m.artista.toLowerCase();
+    const tomLower = m.tom.toLowerCase();
+
+    const matchNome = nomeLower.includes(filtroNome) || tomLower.includes(filtroNome) || artistaLower.includes(filtroNome);
+    if (!matchNome) return false;
+
+    const matchMusica = !filtroMusica || (filtroMusica === 'comCifra' ? !!m.link : true);
+    const matchArtista = !filtroArtista || artistaLower.includes(filtroArtista.toLowerCase());
+    const matchData = !filtroData || m.data === filtroData;
+
+    let matchLetra = true;
+    if (filtroLetra) {
+      const dadosFb = dadosFirebaseMap.get(normalizarNome(m.nome, m.artista));
+      const letraFb = dadosFb?.letra?.toLowerCase() || '';
+      matchLetra = letraFb.includes(filtroLetra);
     }
-    return true;
+
+    return matchMusica && matchArtista && matchData && matchLetra;
   });
 
-  mostrarResultados(filtrados.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
-}
+  // Ordenar por data decrescente
+  filtradas.sort((a, b) => {
+    const dateA = a.data ? new Date(a.data.split('/').reverse().join('-')) : new Date(0);
+    const dateB = b.data ? new Date(b.data.split('/').reverse().join('-')) : new Date(0);
+    return dateB - dateA;
+  });
 
-function mostrarResultados(lista) {
   const container = document.getElementById('resultados');
-  if (!lista.length) {
-    container.innerHTML = `
-      <div class="col-12 text-center py-5">
-        <i class="bi bi-music-note-beamed display-1 text-muted"></i>
-        <h4 class="mt-3 text-muted">Nenhuma música</h4>
-      </div>
-    `;
+  if (!filtradas.length) {
+    container.innerHTML = '<p class="text-center text-muted">Nenhuma música encontrada.</p>';
     return;
   }
 
-  container.innerHTML = lista.map(m => {
-    const chaveCompleta = normalizarNome(m.nome, m.artista);
-    const chaveSimples = normalizarNome(m.nome, '');
-    const dadosFb = dadosFirebaseMap.get(chaveCompleta) || dadosFirebaseMap.get(chaveSimples);
-    
-    const letra = dadosFb?.letra || 'Letra não encontrada';
-    const cifraTexto = dadosFb?.cifra || ''; // se ainda tiver o campo texto (opcional)
-    const urlImagemCifra = dadosFb?.url_imagem_cifra || ''; // NOVO CAMPO
-    const videoId = m.link?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
+  container.innerHTML = filtradas.map(m => {
+    const chaveNorm = normalizarNome(m.nome, m.artista);
+    const dadosFb = dadosFirebaseMap.get(chaveNorm);
+    const letra = dadosFb?.letra || 'Letra não disponível';
+    const cifraTexto = dadosFb?.cifra || '';
+    const urlImagemCifra = dadosFb?.url_imagem_cifra || '';
+
+    const videoId = m.link?.match(/(?:youtube(?:-nocookie)?\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
 
     return `
-      <div class="col-12 col-lg-6 col-xl-4">
-        <div class="card musica-card h-100 shadow-lg">
-          <div class="card-body">
-            <h5 class="card-title fw-bold mb-1">${m.nome}</h5>
-            <p class="card-text mb-3 small">
-              ${m.artista ? `<i class="bi bi-person-fill me-1">${m.artista}</i>` : 'Não informado'}<br>
-              ${m.tom ? `<i class="bi bi-music-note-list me-1">${m.tom}</i>` : 'Não informado'}
-              ${m.data ? `<br><i class="bi bi-calendar me-1">${m.data}</i>` : ''}
-            </p>
-            ${videoId ? `
-              <iframe class="w-100 rounded mb-3" height="180" src="https://www.youtube.com/embed/${videoId}" title="${m.nome}" allowfullscreen loading="lazy"></iframe>
-            ` : ''}
-            <!-- NOVO: Botão e visualização da CIFRA (imagem) -->
-            <details class="mb-3">
-              <summary class="btn btn-light btn-sm w-100 mb-2 fw-bold"><i class="bi bi-file-earmark-music me-1"></i>Cifra</summary>
-              <div class="cifra bg-light p-3 rounded small text-center" style="font-family:monospace;max-height:400px;overflow-y:auto;">
-                ${urlImagemCifra 
-                  ? `<img src="${urlImagemCifra}" alt="Cifra da música ${m.nome}" class="img-fluid rounded shadow-sm" loading="lazy" style="max-width:100%;">`
-                  : `<p class="text-muted my-3">Cifra (imagem) não disponível</p>`
-                }
-                ${cifraTexto ? `<pre class="mt-3 text-start small">${cifraTexto}</pre>` : ''}
-              </div>
-            </details>
-            <details>
-              <summary class="btn btn-outline-light btn-sm w-100 fw-bold"><i class="bi bi-file-earmark-text me-1"></i>Letra</summary>
-              <div class="letra bg-light p-3 rounded small" style="font-family:Georgia,serif;line-height:1.6;max-height:280px;overflow-y:auto;">${letra}</div>
-            </details>
-          </div>
+      <div class="col-12">
+        <div class="musica-card p-3">
+          <h5 class="mb-1">${m.nome}</h5>
+          <p class="mb-2 small opacity-75">
+            <i class="bi bi-music-note-beamed me-1"></i>${m.tom || 'Tom não informado'} - ${m.artista || 'Artista não informado'}
+            ${m.data ? `<br><i class="bi bi-calendar me-1">${m.data}</i>` : ''}
+          </p>
+          ${videoId ? `
+            <iframe class="w-100 rounded mb-3" height="180" src="https://www.youtube.com/embed/${videoId}" title="${m.nome}" allowfullscreen loading="lazy"></iframe>
+          ` : ''}
+          <!-- NOVO: Botão e visualização da CIFRA (imagem) -->
+          <details class="mb-3">
+            <summary class="btn btn-light btn-sm w-100 mb-2 fw-bold"><i class="bi bi-file-earmark-music me-1"></i>Cifra</summary>
+            <div class="cifra bg-light p-3 rounded small text-center" style="font-family:monospace; overflow-y: hidden; max-height: none;">
+              ${urlImagemCifra 
+                ? `<img src="${urlImagemCifra}" alt="Cifra da música ${m.nome}" class="img-fluid rounded shadow-sm" loading="lazy" style="max-width:100%; height:auto; display:block; margin:0 auto;">`
+                : `<p class="text-muted my-3">Cifra (imagem) não disponível</p>`
+              }
+              ${cifraTexto ? `<pre class="mt-3 text-start small" style="white-space: pre-wrap;">${cifraTexto}</pre>` : ''}
+            </div>
+          </details>
+          <details>
+            <summary class="btn btn-outline-light btn-sm w-100 fw-bold"><i class="bi bi-file-earmark-text me-1"></i>Letra</summary>
+            <div class="letra bg-light p-3 rounded small" style="font-family:Georgia,serif;line-height:1.6;max-height:280px;overflow-y:auto;">${letra}</div>
+          </details>
         </div>
       </div>
     `;
