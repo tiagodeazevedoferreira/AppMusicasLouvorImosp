@@ -18,6 +18,16 @@ def normalize_key(musica, artista):
     key = f"{unidecode(musica).lower().strip().replace(' ', '-').replace('/', '-') }---{unidecode(artista).lower().strip().replace(' ', '-').replace('/', '-')}"
     return re.sub(r'[^a-z0-9\-]', '-', key)
 
+def transform_to_thumbnail(url):
+    if not url:
+        return ''
+    # Extrai o ID do link do Google Drive (padrão /d/ID/)
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+    if match:
+        file_id = match.group(1)
+        return f'https://drive.google.com/thumbnail?id={file_id}&sz=w1000'
+    return url  # Retorna o original se não for Drive
+
 def scrape_letra_and_cifra(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -83,6 +93,9 @@ def main():
             artista = row.get('Artista', '').strip()
             link_cifraclub = row.get('Cifra', '').strip()          # Coluna F
             url_imagem_cifra = row.get('Cifra_Imagem', '').strip() # Coluna H (nova)
+            
+            # Transforma automaticamente o link em thumbnail se for Drive
+            url_imagem_cifra = transform_to_thumbnail(url_imagem_cifra)
             
             print(f"Processando: {musica} - {artista}")
             key = normalize_key(musica, artista)
