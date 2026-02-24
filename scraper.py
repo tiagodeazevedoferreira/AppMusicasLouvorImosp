@@ -65,9 +65,9 @@ def main():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         
         client = gspread.authorize(creds)
-        sheet = client.open_by_key(SHEET_ID).worksheet("Músicas")
+        sheet = client.open_by_key(SHEET_ID).worksheet("Musicas")  # ← Alterado aqui: sem acento
         records = sheet.get_all_records()
-        print(f"📊 Encontradas {len(records)} linhas na aba Músicas")
+        print(f"📊 Encontradas {len(records)} linhas na aba Musicas")
         
         cred = credentials.Certificate(creds_dict)
         firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
