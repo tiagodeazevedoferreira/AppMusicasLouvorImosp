@@ -29,33 +29,68 @@ def transform_to_thumbnail(url):
     return url  # Retorna o original se não for Drive
 
 def scrape_letra_and_cifra(url):
+    if not url:
+        return "Sem link de cifra", "Sem link de cifra"
+    
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         resp = requests.get(url, timeout=15, headers=headers)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'lxml')
         
-        letra_div = (soup.find('div', class_='cnt-letra') or 
-                     soup.find('div', {'data-testid': 'lyrics-container'}) or
-                     soup.find('div', class_=re.compile(r'lyric|song|letra|lyrics')) or
-                     soup.find('pre'))
+        # Tenta encontrar o container principal da letra/cifra
+        letra_div = (
+            soup.find('div', class_='cnt-letra') or
+            soup.find('div', {'data-testid': 'lyrics-container'}) or
+            soup.find('div', class_=re.compile(r'(lyric|song|letra|lyrics|cnt_html)', re.I)) or
+            soup.find('pre') or
+            soup.find('div', class_='letra')
+        )
         
-        if letra_div and len(letra_div.get_text(strip=True)) > 50:
-            cifra = letra_div.get_text(separator='\n', strip=True)
-            
-            letra_div_copy = deepcopy(letra_div)
-            for chord in letra_div_copy.find_all(['span', 'b', 'strong'], class_=re.compile(r'(chord|cnt-chord|cifra_chord)', re.I)):
-                chord.decompose()
-            letra = letra_div_copy.get_text(separator='\n', strip=True)
-            
-            return letra[:10000], cifra[:10000]
+        if not letra_div or len(letra_div.get_text(strip=True)) < 50:
+            # Fallback: pega o texto mais relevante da página
+            content = soup.get_text(separator='\n')
+            lines = [line.strip() for line in content.split('\n') if len(line.strip()) > 10]
+            texto = '\n'.join(lines[:60])  # limite para evitar lixo excessivo
+            return texto, texto
         
-        # Fallback simples
-        content = soup.get_text(separator='\n')
-        lines = [line.strip() for line in content.split('\n') if len(line.strip()) > 15]
-        texto = '\n'.join(lines[:50])
-        return texto if len(texto) > 200 else f"Letra não encontrada em {url}", texto
+        # Extrai cifra completa (com acordes)
+        cifra = letra_div.get_text(separator='\n', strip=True)
         
+        # Cria cópia para extrair só a letra (remove acordes)
+        letra_div_copy = deepcopy(letra_div)
+        # Remove spans de acordes comuns no Cifra Club
+        for chord in letra_div_copy.find_all(['span', 'b', 'strong', 'div'], class_=re.compile(r'(chord|cnt-chord|cifra_chord|tom|acorde)', re.I)):
+            chord.decompose()
+        # Remove também elementos de propaganda conhecidos
+        for elem in letra_div_copy.find_all(['div', 'p', 'span'], string=re.compile(r'(Cifra Club|Selo Cifra Club|Equipe de Qualidade|O que você quer tocar hoje|violão e guitarra|Principal|revisada para atender)', re.I)):
+            elem.decompose()
+        
+        letra_raw = letra_div_copy.get_text(separator='\n', strip=True)
+        
+        # Limpeza adicional: remove linhas indesejadas comuns
+        linhas = [line.strip() for line in letra_raw.split('\n') if line.strip()]
+        linhas_limpa = []
+        lixo_patterns = [
+            r'Cifra Club', r'Selo Cifra Club', r'Equipe de Qualidade', 
+            r'O que você quer tocar hoje', r'violão e guitarra', r'Principal', 
+            r'revisada para atender', r'Blog do Cifra Club', r'^\s*$'
+        ]
+        
+        for linha in linhas:
+            if not any(re.search(pat, linha, re.I) for pat in lixo_patterns):
+                if len(linha) > 5:  # ignora linhas muito curtas que não são parte da letra
+                    linhas_limpa.append(linha)
+        
+        letra = '\n'.join(linhas_limpa)[:10000]
+        cifra = cifra[:10000]  # cifra mantém os acordes
+        
+        # Se a letra ficou muito pequena, usa fallback
+        if len(letra) < 100:
+            return "Letra não identificada corretamente", cifra
+        
+        return letra, cifra
+    
     except Exception as e:
         err = f"Erro ao raspar {url}: {str(e)[:120]}"
         return err, err
