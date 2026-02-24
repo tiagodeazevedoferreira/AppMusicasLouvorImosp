@@ -1,6 +1,6 @@
 const SHEETID = "1OuMaJ-nyFujxE-QNoZCE8iyaPEmRfJLHWr5DfevX6cc";
 const SHEETTAB = "Musicas";  // Nome exato da aba (corrigido do gid)
-const APIKEY = "AIzaSyC9rb5ka5OzrtDfktGPmue4C7Xr6trO_YA";  // NOVA CHAVE
+const APIKEY = "AIzaSyAVdsQ-1qWuxN74IBtKy3YXUmSKBZT6uWQ";  // NOVA CHAVE
 
 let musicas = [];
 let dadosFirebaseMap = new Map();
@@ -55,7 +55,9 @@ async function carregarDados() {
           Object.keys(dados).forEach(chave => {
             dadosFirebaseMap.set(chave, {
               letra: dados[chave].letra || 'Letra não encontrada',
-              urlcifra: dados[chave].urlcifra || ''
+              urlcifra: dados[chave].urlcifra || '',
+              cifra: dados[chave].cifra || '',  // Campo opcional de cifra texto
+              url_imagem_cifra: dados[chave].url_imagem_cifra || ''  // Novo campo de imagem
             });
           });
           console.log('Firebase OK,', dadosFirebaseMap.size, 'letras');
@@ -78,6 +80,11 @@ async function carregarDados() {
   }
 }
 
+function preencherSelect(id, options) {
+  const select = document.getElementById(id);
+  select.innerHTML = '<option value="">Todos/Todas</option>' + options.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+}
+
 function preencherFiltros() {
   const artistas = [...new Set(musicas.map(m => m.artista))].sort();
   preencherSelect('filtroArtista', artistas);
@@ -89,19 +96,13 @@ function preencherFiltros() {
   preencherSelect('filtroMusica', nomesMusicas);
 }
 
-function preencherSelect(id, lista) {
-  const select = document.getElementById(id);
-  while (select.options.length > 1) select.remove(1);
-  lista.forEach(valor => select.add(new Option(valor, valor)));
-}
-
 function filtrarEMostrar() {
   const filtros = {
-    nome: document.getElementById('filtroNome')?.value?.trim().toLowerCase() || '',
-    musica: document.getElementById('filtroMusica')?.value || '',
-    artista: document.getElementById('filtroArtista')?.value || '',
-    data: document.getElementById('filtroData')?.value || '',
-    letra: document.getElementById('filtroLetra')?.value?.trim().toLowerCase() || ''
+    nome: document.getElementById('filtroNome')?.value.trim().toLowerCase() || '',
+    musica: document.getElementById('filtroMusica')?.value.trim() || '',
+    artista: document.getElementById('filtroArtista')?.value.trim() || '',
+    data: document.getElementById('filtroData')?.value.trim() || '',
+    letra: document.getElementById('filtroLetra')?.value.trim().toLowerCase() || ''
   };
 
   const filtrados = musicas.filter(m => {
@@ -110,8 +111,7 @@ function filtrarEMostrar() {
     if (filtros.artista && m.artista !== filtros.artista) return false;
     if (filtros.data && m.data !== filtros.data) return false;
     if (filtros.letra) {
-      const chave = normalizarNome(m.nome, m.artista);
-      const dadosFb = dadosFirebaseMap.get(chave) || dadosFirebaseMap.get(normalizarNome(m.nome, ''));
+      const dadosFb = dadosFirebaseMap.get(normalizarNome(m.nome, m.artista)) || dadosFirebaseMap.get(normalizarNome(m.nome, ''));
       return (dadosFb?.letra?.toLowerCase().includes(filtros.letra) ||
               normalizarNome(m.nome, '').includes(filtros.letra));
     }
@@ -137,8 +137,10 @@ function mostrarResultados(lista) {
     const chaveCompleta = normalizarNome(m.nome, m.artista);
     const chaveSimples = normalizarNome(m.nome, '');
     const dadosFb = dadosFirebaseMap.get(chaveCompleta) || dadosFirebaseMap.get(chaveSimples);
+    
     const letra = dadosFb?.letra || 'Letra não encontrada';
-    const cifra = dadosFb?.urlcifra || '';
+    const cifraTexto = dadosFb?.cifra || ''; // se ainda tiver o campo texto (opcional)
+    const urlImagemCifra = dadosFb?.url_imagem_cifra || ''; // NOVO CAMPO
     const videoId = m.link?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
 
     return `
@@ -154,12 +156,17 @@ function mostrarResultados(lista) {
             ${videoId ? `
               <iframe class="w-100 rounded mb-3" height="180" src="https://www.youtube.com/embed/${videoId}" title="${m.nome}" allowfullscreen loading="lazy"></iframe>
             ` : ''}
-            ${cifra ? `
-              <details class="mb-3">
-                <summary class="btn btn-light btn-sm w-100 mb-2 fw-bold"><i class="bi bi-guitar me-1"></i>Cifra</summary>
-                <div class="cifra bg-light p-3 rounded small" style="font-family:monospace;max-height:200px;overflow-y:auto;">${cifra}</div>
-              </details>
-            ` : ''}
+            <!-- NOVO: Botão e visualização da CIFRA (imagem) -->
+            <details class="mb-3">
+              <summary class="btn btn-light btn-sm w-100 mb-2 fw-bold"><i class="bi bi-file-earmark-music me-1"></i>Cifra</summary>
+              <div class="cifra bg-light p-3 rounded small text-center" style="font-family:monospace;max-height:400px;overflow-y:auto;">
+                ${urlImagemCifra 
+                  ? `<img src="${urlImagemCifra}" alt="Cifra da música ${m.nome}" class="img-fluid rounded shadow-sm" loading="lazy" style="max-width:100%;">`
+                  : `<p class="text-muted my-3">Cifra (imagem) não disponível</p>`
+                }
+                ${cifraTexto ? `<pre class="mt-3 text-start small">${cifraTexto}</pre>` : ''}
+              </div>
+            </details>
             <details>
               <summary class="btn btn-outline-light btn-sm w-100 fw-bold"><i class="bi bi-file-earmark-text me-1"></i>Letra</summary>
               <div class="letra bg-light p-3 rounded small" style="font-family:Georgia,serif;line-height:1.6;max-height:280px;overflow-y:auto;">${letra}</div>
@@ -182,4 +189,3 @@ window.limparFiltros = () => {
 document.addEventListener('DOMContentLoaded', carregarDados);
 ['filtroNome', 'filtroLetra'].forEach(id => document.getElementById(id)?.addEventListener('input', filtrarEMostrar));
 ['filtroMusica', 'filtroArtista', 'filtroData'].forEach(id => document.getElementById(id)?.addEventListener('change', filtrarEMostrar));
-
