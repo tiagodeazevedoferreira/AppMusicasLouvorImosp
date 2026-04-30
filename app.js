@@ -89,8 +89,12 @@ function preencherFiltros() {
   const artistas = [...new Set(musicas.map(m => m.artista))].sort();
   preencherSelect('filtroArtista', artistas);
 
-  const datas = [...new Set(musicas.map(m => m.data).filter(Boolean))].sort((a, b) => b.localeCompare(a, 'pt-BR'));
-  preencherSelect('filtroData', datas);
+const datas = [...new Set(musicas.map(m => m.data).filter(Boolean))]
+  .sort((a, b) => {
+    const [da, ma, aa] = a.split('/');
+    const [db, mb, ab] = b.split('/');
+    return new Date(aa, ma - 1, da) - new Date(ab, mb - 1, db);
+  });
 
   const nomesMusicas = [...new Set(musicas.map(m => m.nome))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   preencherSelect('filtroMusica', nomesMusicas);
