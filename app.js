@@ -92,12 +92,12 @@ function preencherFiltros() {
 const datas = [...new Set(
   musicas
     .map(m => m.data?.trim())
-    .filter(d => d && /^\d{2}\/\d{2}\/\d{4}$/.test(d)) // garante formato válido
+    .filter(Boolean)
 )]
 .sort((a, b) => {
   const parse = (d) => {
     const [dia, mes, ano] = d.split('/');
-    return new Date(Number(ano), Number(mes) - 1, Number(dia));
+    return new Date(ano, mes - 1, dia);
   };
   return parse(a) - parse(b);
 });
