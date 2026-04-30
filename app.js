@@ -89,18 +89,29 @@ function preencherFiltros() {
   const artistas = [...new Set(musicas.map(m => m.artista))].sort();
   preencherSelect('filtroArtista', artistas);
 
-const datas = [...new Set(
-  musicas
-    .map(m => m.data?.trim())
-    .filter(Boolean)
-)]
-.sort((a, b) => {
-  const parse = (d) => {
-    const [dia, mes, ano] = d.split('/');
-    return new Date(ano, mes - 1, dia);
-  };
-  return parse(a) - parse(b);
-});
+  // 👇 NOVO BLOCO DE DATAS
+  const datas = [];
+
+  musicas.forEach(m => {
+    if (m.data) {
+      const d = m.data.trim();
+      if (d && !datas.includes(d)) {
+        datas.push(d);
+      }
+    }
+  });
+
+  datas.sort((a, b) => {
+    const [da, ma, aa] = a.split('/');
+    const [db, mb, ab] = b.split('/');
+    return new Date(aa, ma - 1, da) - new Date(ab, mb - 1, db);
+  });
+
+  // 👇 LOGS (OPCIONAL, SÓ PARA DEBUG)
+  console.log('MUSICAS NO FILTRO:', musicas.length);
+  console.log('DATAS CALCULADAS:', datas);
+
+  preencherSelect('filtroData', datas);
 
   const nomesMusicas = [...new Set(musicas.map(m => m.nome))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   preencherSelect('filtroMusica', nomesMusicas);
